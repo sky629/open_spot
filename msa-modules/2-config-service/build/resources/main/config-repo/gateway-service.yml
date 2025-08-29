@@ -1,0 +1,35 @@
+spring:
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: auth-service
+              uri: http://localhost:8081
+              predicates:
+                - Path=/api/v1/auth/**, /api/v1/users/**
+              filters:
+                - StripPrefix=0
+
+            - id: analysis-service
+              uri: http://localhost:8082
+              predicates:
+                - Path=/api/v1/stores/**, /api/v1/reports/**
+              filters:
+                - StripPrefix=0
+
+        globalcors:
+          cors-configurations:
+            '[/**]':
+              allowedOrigins: "*"
+              allowedMethods: "*"
+              allowedHeaders: "*"
+            
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, gateway

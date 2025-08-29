@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: config-service
+  profiles:
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/config-repo
+        health:
+          repositories:
+            config:
+              label: main
+              name: config
+              profiles: default
+
+server:
+  port: 9999
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, env

@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: analysis-service
+  cloud:
+    config:
+      uri: http://localhost:9999
+      fail-fast: true
+      retry:
+        initial-interval: 3000
+        max-interval: 10000
+        max-attempts: 20
