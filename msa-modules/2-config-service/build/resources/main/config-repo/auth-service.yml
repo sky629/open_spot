@@ -1,17 +1,19 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:15432/openspot
-    username: openspot
-    password: openspot
+    url: jdbc:postgresql://localhost:5432/openspot
+    username: postgres
+    password: postgres
     driver-class-name: org.postgresql.Driver
     
   jpa:
     hibernate:
       ddl-auto: validate
+      default_schema: auth_service
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        default_schema: auth_service
     show-sql: false
     
   flyway:

@@ -11,7 +11,8 @@ dependencies {
     implementation("org.springframework.cloud:spring-cloud-starter-config")
     implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j")
     implementation("org.springframework.kafka:spring-kafka")
-    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-core:10.0.0")
+    implementation("org.flywaydb:flyway-database-postgresql:10.0.0")
     implementation("org.hibernate:hibernate-spatial:6.4.4.Final")
     
     runtimeOnly("org.postgresql:postgresql")

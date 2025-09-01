@@ -1,17 +1,19 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:15432/openspot
-    username: openspot
-    password: openspot
+    url: jdbc:postgresql://localhost:5432/openspot
+    username: postgres
+    password: postgres
     driver-class-name: org.postgresql.Driver
     
   jpa:
     hibernate:
       ddl-auto: validate
+      default_schema: analysis_service
     properties:
       hibernate:
         dialect: org.hibernate.spatial.dialect.postgis.PostgisPG10Dialect
         format_sql: true
+        default_schema: analysis_service
     show-sql: false
     
   flyway:
@@ -21,7 +23,7 @@ spring:
     
   redis:
     host: localhost
-    port: 16379
+    port: 6379
     timeout: 3000ms
     lettuce:
       pool:

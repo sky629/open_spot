@@ -141,9 +141,9 @@ export JWT_SECRET=your-jwt-secret-key
 ### 데이터베이스
 Docker Compose로 시작되는 PostgreSQL:
 - **Host**: localhost:5432
-- **User**: openspot
-- **Password**: openspot123
-- **Databases**: openspot_auth, openspot_analysis
+- **User**: postgres
+- **Password**: postgres
+- **Databases**: openspot
 
 ## 📊 모니터링
 
