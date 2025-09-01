@@ -54,7 +54,7 @@ C. 인증 서비스 (auth-service)
 
 GET /login/oauth2/code/google: Google 로그인 콜백 처리 (Spring Security가 상당 부분 자동 처리)
 
-GET /api/users/me: 로그인된 사용자 정보 조회
+GET /api/users/self: 로그인된 사용자 정보 조회
 
 POST /api/auth/token/refresh: JWT 토큰 갱신
 
