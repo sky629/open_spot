@@ -2,6 +2,17 @@
 
 echo "🚀 Starting Open-Spot Domain Services..."
 
+# Load environment variables from .env file
+if [ -f .env ]; then
+    echo "📄 Loading environment variables from .env file..."
+    set -a
+    source .env
+    set +a
+    echo "✅ Environment variables loaded"
+else
+    echo "⚠️ No .env file found. Using system environment variables."
+fi
+
 # Check if infrastructure is running
 if ! curl -f http://localhost:9999/actuator/health >/dev/null 2>&1; then
     echo "❌ Config Service is not running. Please start infrastructure first:"
