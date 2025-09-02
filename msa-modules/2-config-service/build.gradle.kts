@@ -7,6 +7,9 @@ dependencies {
     
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.mockk:mockk:1.13.12")
+    
+    // DevTools for auto-reload (development only)
+    developmentOnly("org.springframework.boot:spring-boot-devtools")
 
 }
 

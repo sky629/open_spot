@@ -825,7 +825,7 @@ api.interceptors.response.use(
 // Authentication API
 export const authAPI = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
-    const response = await api.post<ApiResponse<AuthResponse>>('/auth/login', credentials);
+    const response = await api.post<ApiResponse<AuthResponse>>('/auth/google/login', credentials);
     return response.data.data!;
   },
 

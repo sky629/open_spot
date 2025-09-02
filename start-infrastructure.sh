@@ -18,7 +18,7 @@ echo "📦 Starting Docker containers (PostgreSQL, Redis, Kafka)..."
 docker-compose up -d
 
 echo "⏳ Waiting for services to be ready..."
-sleep 10
+sleep 2
 
 # Check if services are running
 echo "✅ Checking service health..."

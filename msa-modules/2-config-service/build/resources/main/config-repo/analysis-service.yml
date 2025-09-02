@@ -7,13 +7,13 @@ spring:
     
   jpa:
     hibernate:
-      ddl-auto: validate
-      default_schema: analysis_service
+      ddl-auto: create # validate
+      default_schema: analysis
     properties:
       hibernate:
         dialect: org.hibernate.spatial.dialect.postgis.PostgisPG10Dialect
         format_sql: true
-        default_schema: analysis_service
+        default_schema: analysis
     show-sql: false
     
   flyway:
@@ -46,7 +46,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info
+        include: health, info, refresh
 
 resilience4j:
   circuitbreaker:

@@ -1,5 +1,7 @@
 package com.kangpark.openspot.auth.config
 
+import com.kangpark.openspot.auth.controller.handler.OAuth2LoginFailureHandler
+import com.kangpark.openspot.auth.controller.handler.OAuth2LoginSuccessHandler
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
@@ -13,7 +15,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
 @Configuration
 @EnableWebSecurity
-open class AuthSecurityConfig {
+open class AuthSecurityConfig(
+    private val oAuth2LoginSuccessHandler: OAuth2LoginSuccessHandler,
+    private val oAuth2LoginFailureHandler: OAuth2LoginFailureHandler
+) {
 
     @Bean
     @Primary
@@ -24,30 +29,23 @@ open class AuthSecurityConfig {
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests { requests ->
                 requests
-                    // Public endpoints - no authentication required
-                    .requestMatchers(
-                        "/actuator/health",
-                        "/actuator/info", 
-                        "/api/v1/auth/health",
-                        "/api/v1/auth/login",
-                        "/api/v1/auth/oauth2/**",
-                        "/login/oauth2/**",
-                        "/oauth2/**"
-                    ).permitAll()
-                    // Protected endpoints - authentication required
-                    .requestMatchers(
-                        "/api/v1/users/**",
-                        "/api/v1/auth/refresh",
-                        "/api/v1/auth/logout"
-                    ).authenticated()
-                    // All other requests require authentication
+                    // 헬스 체크 엔드포인트는 인증 없이 접근 허용
+                    .requestMatchers("/api/v1/auth/health", "/actuator/health").permitAll()
+                    // OAuth2 로그인 관련 엔드포인트 허용
+                    .requestMatchers("/api/v1/auth/google/login", "/oauth2/**", "/login/oauth2/**").permitAll()
+                    // 토큰 갱신은 인증 없이 허용 (리프레시 토큰으로 검증)
+                    .requestMatchers("/api/v1/auth/token/refresh").permitAll()
+                    // 사용자 관련 API는 인증 필요
+                    .requestMatchers("/api/v1/users/**").authenticated()
+                    // 로그아웃은 인증 필요
+                    .requestMatchers("/api/v1/auth/logout").authenticated()
                     .anyRequest().authenticated()
             }
             .oauth2Login { oauth2 ->
                 oauth2
-                    .loginPage("/api/v1/auth/login")
-                    .defaultSuccessUrl("/api/v1/auth/success")
-                    .failureUrl("/api/v1/auth/failure")
+                    .loginPage("/api/v1/auth/google/login")
+                    .successHandler(oAuth2LoginSuccessHandler)
+                    .failureHandler(oAuth2LoginFailureHandler)
             }
             .build()
     }

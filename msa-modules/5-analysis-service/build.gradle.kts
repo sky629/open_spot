@@ -17,6 +17,9 @@ dependencies {
     
     runtimeOnly("org.postgresql:postgresql")
     
+    // DevTools for auto-reload (development only)
+    developmentOnly("org.springframework.boot:spring-boot-devtools")
+    
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.springframework.kafka:spring-kafka-test")

@@ -252,7 +252,7 @@ spring:
 ### Key API Endpoints
 ```bash
 # Auth Service  
-POST /api/v1/auth/login          # Google OAuth2 login
+POST /api/v1/auth/google/login          # Google OAuth2 login
 GET  /api/v1/users/self            # Current user profile
 POST /api/v1/auth/token/refresh  # JWT token refresh
 
