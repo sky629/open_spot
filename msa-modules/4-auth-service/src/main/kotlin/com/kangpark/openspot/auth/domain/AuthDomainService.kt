@@ -14,27 +14,34 @@ class AuthDomainService(
     val refreshTokenRepository: RefreshTokenRepository,
     val socialAccountRepository: SocialAccountRepository
 ) {
-    
+
     /**
-     * Google OAuth2 정보로 사용자 등록 또는 업데이트
+     * Google OAuth2 정보로 사용자 등록
      */
-    fun registerOrUpdateUser(
+    fun registerUser(
         socialId: String,
         email: String,
         name: String,
         pictureUrl: String?
     ): User {
+        val newUser = User.create(socialId, email, name, pictureUrl)
+        return userRepository.save(newUser)
+    }
+
+    /**
+     * Google OAuth2 정보로 사용자 업데이트
+     */
+    fun updateUser(
+        socialId: String,
+        name: String,
+        pictureUrl: String?
+    ): User? {
         val existingUser = userRepository.findBySocialId(socialId)
-        
-        return if (existingUser != null) {
-            // 기존 사용자 정보 업데이트
+        if (existingUser != null) {
             val updatedUser = existingUser.updateProfile(name, pictureUrl)
-            userRepository.save(updatedUser)
-        } else {
-            // 새 사용자 등록
-            val newUser = User.create(socialId, email, name, pictureUrl)
-            userRepository.save(newUser)
+            return userRepository.save(updatedUser)
         }
+        return null
     }
     
     /**
@@ -76,11 +83,11 @@ class AuthDomainService(
     fun cleanupExpiredTokens() {
         refreshTokenRepository.deleteExpiredTokens()
     }
-    
+
     /**
-     * 소셜 계정 등록 또는 업데이트
+     * 소셜 계정 등록
      */
-    fun registerOrUpdateSocialAccount(
+    fun registerSocialAccount(
         userId: UUID,
         provider: SocialProvider,
         providerId: String,
@@ -88,25 +95,36 @@ class AuthDomainService(
         displayName: String,
         profileImageUrl: String?
     ): SocialAccount {
+        val newSocialAccount = SocialAccount.create(
+            userId = userId,
+            provider = provider,
+            providerId = providerId,
+            email = email,
+            displayName = displayName,
+            profileImageUrl = profileImageUrl,
+            connectedAt = LocalDateTime.now()
+        )
+        return socialAccountRepository.save(newSocialAccount)
+    }
+
+    /**
+     * 소셜 계정 등록 또는 업데이트
+     */
+    fun updateSocialAccount(
+        userId: UUID,
+        provider: SocialProvider,
+        email: String,
+        displayName: String,
+        profileImageUrl: String?
+    ): SocialAccount? {
         val existingSocialAccount = socialAccountRepository.findByUserIdAndProvider(userId, provider)
-        
-        return if (existingSocialAccount != null) {
+
+        if (existingSocialAccount != null) {
             // 기존 소셜 계정 정보 업데이트
             val updatedSocialAccount = existingSocialAccount.updateInfo(email, displayName, profileImageUrl)
-            socialAccountRepository.save(updatedSocialAccount)
-        } else {
-            // 새로운 소셜 계정 등록
-            val newSocialAccount = SocialAccount.create(
-                userId = userId,
-                provider = provider,
-                providerId = providerId,
-                email = email,
-                displayName = displayName,
-                profileImageUrl = profileImageUrl,
-                connectedAt = LocalDateTime.now()
-            )
-            socialAccountRepository.save(newSocialAccount)
+            return socialAccountRepository.save(updatedSocialAccount)
         }
+        return null
     }
     
     /**

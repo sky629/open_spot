@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("org.springframework.boot") version "3.5.5" apply false
-    id("io.spring.dependency-management") version "1.1.6" apply false
+    id("io.spring.dependency-management") version "1.1.6"
     kotlin("jvm") version "1.9.25" apply false
     kotlin("plugin.spring") version "1.9.25" apply false
     kotlin("plugin.jpa") version "1.9.25" apply false
@@ -23,6 +23,7 @@ subprojects {
     plugins.apply("java")
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlin.plugin.spring")
+    apply(plugin = "org.jetbrains.kotlin.plugin.jpa")
     apply(plugin = "org.springframework.boot")
     apply(plugin = "io.spring.dependency-management")
 
@@ -44,7 +45,7 @@ subprojects {
         add("testImplementation", "org.springframework.boot:spring-boot-starter-test")
         add("testImplementation", "org.junit.jupiter:junit-jupiter")
         add("testImplementation", "org.assertj:assertj-core")
-        add("testImplementation", "io.mockk:mockk")
+        add("testImplementation", "io.mockk:mockk:1.13.10")
     }
 
     tasks.withType<KotlinCompile> {

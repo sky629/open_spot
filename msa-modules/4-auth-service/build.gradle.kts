@@ -12,8 +12,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.cloud:spring-cloud-starter-config")
     implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j")
-    implementation("org.flywaydb:flyway-core:10.0.0")
-    implementation("org.flywaydb:flyway-database-postgresql:10.0.0")
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-database-postgresql")
     
     // JWT dependencies
     implementation("io.jsonwebtoken:jjwt-api:0.11.5")
@@ -21,7 +21,7 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-jackson:0.11.5")
     
     // Swagger/OpenAPI dependencies
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0")
     
     runtimeOnly("org.postgresql:postgresql")
     
@@ -33,7 +33,6 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
-    testImplementation("io.mockk:mockk:1.13.12")
 }
 
 dependencyManagement {

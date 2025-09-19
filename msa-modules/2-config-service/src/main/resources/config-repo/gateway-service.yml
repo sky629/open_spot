@@ -11,19 +11,15 @@ spring:
               filters:
                 - StripPrefix=0
 
-            - id: analysis-service
-              uri: http://${ANALYSIS_SERVICE_HOST:localhost}:${ANALYSIS_SERVICE_PORT:8082}
+            - id: location-service
+              uri: http://${LOCATION_SERVICE_HOST:localhost}:${LOCATION_SERVICE_PORT:8082}
               predicates:
                 - Path=/api/v1/stores/**, /api/v1/reports/**
               filters:
                 - StripPrefix=0
-
-        globalcors:
-          cors-configurations:
-            '[/**]':
-              allowedOrigins: "*"
-              allowedMethods: "*"
-              allowedHeaders: "*"
+      default-filters:
+        - AddResponseHeader=X-Frame-Options, SAMEORIGIN
+        - name: ForwardedHeaders
             
 server:
   port: 8080

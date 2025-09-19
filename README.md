@@ -8,7 +8,7 @@ Open-Spot은 서울시 공공데이터를 활용한 상권분석 서비스의 MS
 - **config-service** (9999): Spring Cloud Config Server
 - **gateway-service** (8080): Spring Cloud Gateway  
 - **auth-service** (8081): 인증/사용자 관리
-- **analysis-service** (8082): 상권 분석 (PostGIS, Redis, Kafka)
+- **location-service** (8082): 장소 정보 관련 서비스 (PostGIS, Redis, Kafka)
 - **notification-service** (8083): 알림 (Kafka Consumer)
 
 ### 기술 스택
@@ -36,7 +36,7 @@ Open-Spot은 서울시 공공데이터를 활용한 상권분석 서비스의 MS
 ```
 이 명령어는 다음을 실행합니다:
 - Auth Service (8081)
-- Analysis Service (8082)
+- Location Service (8082)
 - Notification Service (8083)
 
 ### 3. 전체 서비스 종료
@@ -72,7 +72,7 @@ curl http://localhost:8080/actuator/health  # Gateway
 
 # 개별 서비스 테스트
 ./gradlew :auth-service:test
-./gradlew :analysis-service:test
+./gradlew :location-service:test
 ./gradlew :notification-service:test
 
 # 레이어별 테스트 (TDD)
@@ -87,7 +87,7 @@ curl http://localhost:8080/actuator/health  # Gateway
 ./gradlew :config-service:bootRun
 ./gradlew :gateway-service:bootRun
 ./gradlew :auth-service:bootRun
-./gradlew :analysis-service:bootRun
+./gradlew :location-service:bootRun
 ./gradlew :notification-service:bootRun
 ```
 
@@ -101,7 +101,7 @@ open-spot-backend/
 │   ├── 2-config-service/       # Spring Cloud Config
 │   ├── 3-gateway-service/      # Spring Cloud Gateway
 │   ├── 4-auth-service/         # 인증 도메인
-│   ├── 5-analysis-service/     # 상권분석 도메인
+│   ├── 5-location-service/     # 장소 정보 관련 도메인
 │   └── 6-notification-service/ # 알림 도메인
 ├── docker-compose.yml          # 인프라 서비스
 ├── start-infrastructure.sh     # 인프라 시작 스크립트
@@ -151,7 +151,7 @@ Docker Compose로 시작되는 PostgreSQL:
 - Config Service: http://localhost:9999/actuator
 - Gateway Service: http://localhost:8080/actuator  
 - Auth Service: http://localhost:8081/actuator
-- Analysis Service: http://localhost:8082/actuator
+- Location Service: http://localhost:8082/actuator
 - Notification Service: http://localhost:8083/actuator
 
 ## 🔄 개발 워크플로우

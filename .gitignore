@@ -70,6 +70,9 @@ Thumbs.db
 .env.test.local
 .env.production.local
 
+# Firebase service account keys
+**/firebase/*.json
+
 # Compiled class file
 *.class
 

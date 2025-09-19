@@ -40,9 +40,7 @@ class AuthController(
     )
     @GetMapping("/google/login")
     fun login(response: HttpServletResponse) {
-        // MSA 환경에서 Gateway 포트(8080)를 통한 리다이렉트
-        val gatewayUrl = "http://localhost:8080/oauth2/authorization/google"
-        response.sendRedirect(gatewayUrl)
+        response.sendRedirect("/oauth2/authorization/google")
     }
     
     /**

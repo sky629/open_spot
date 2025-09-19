@@ -63,7 +63,7 @@ refresh_all_services() {
         "config-service 9999 Config-Service"
         "gateway-service 8080 Gateway-Service" 
         "auth-service 8081 Auth-Service"
-        "analysis-service 8082 Analysis-Service"
+        "location-service 8082 Location-Service"
         "notification-service 8083 Notification-Service"
     )
     
@@ -110,7 +110,7 @@ show_service_info() {
     echo "  Health: http://localhost:8081/actuator/health"
     echo "  Refresh: http://localhost:8081/actuator/refresh"
     echo ""
-    echo -e "${YELLOW}Analysis Service (port 8082)${NC}"
+    echo -e "${YELLOW}Location Service (port 8082)${NC}"
     echo "  Health: http://localhost:8082/actuator/health"
     echo "  Refresh: http://localhost:8082/actuator/refresh"
     echo ""
@@ -135,8 +135,8 @@ case $SERVICE_NAME in
     "auth-service" | "auth")
         refresh_service_config "auth-service" "8081" "Auth-Service"
         ;;
-    "analysis-service" | "analysis")
-        refresh_service_config "analysis-service" "8082" "Analysis-Service"
+    "location-service" | "location")
+        refresh_service_config "location-service" "8082" "Location-Service"
         ;;
     "notification-service" | "notification")
         refresh_service_config "notification-service" "8083" "Notification-Service"
@@ -147,7 +147,7 @@ case $SERVICE_NAME in
         check_service_health "9999" "Config-Service"
         check_service_health "8080" "Gateway-Service"  
         check_service_health "8081" "Auth-Service"
-        check_service_health "8082" "Analysis-Service"
+        check_service_health "8082" "Location-Service"
         check_service_health "8083" "Notification-Service"
         ;;
     "info")
@@ -157,7 +157,7 @@ case $SERVICE_NAME in
         echo -e "${RED}❌ Unknown service: $SERVICE_NAME${NC}"
         echo ""
         echo -e "${YELLOW}Available services:${NC}"
-        echo "  all, config, gateway, auth, analysis, notification"
+        echo "  all, config, gateway, auth, location, notification"
         echo ""
         echo -e "${YELLOW}Additional commands:${NC}"
         echo "  health - Check health of all services"

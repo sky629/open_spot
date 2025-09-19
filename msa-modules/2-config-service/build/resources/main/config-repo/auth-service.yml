@@ -57,6 +57,12 @@ jwt:
   secret: ${JWT_SECRET:openspot-jwt-secret-key-for-development-only}
   expiration: 86400000 # 24 hours
 
+app:
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+    auth-success-path: ${FRONTEND_AUTH_SUCCESS_PATH:/auth/login/success}
+    auth-error-path: ${FRONTEND_AUTH_ERROR_PATH:/auth/login/error}
+
 server:
   port: 8081
   forward-headers-strategy: framework

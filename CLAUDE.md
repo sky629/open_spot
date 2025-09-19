@@ -4,17 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Open-Spot** is a microservices platform providing AI-based commercial district analysis reports for Seoul entrepreneurs using public data. Built with Spring Boot 3.5.5, Kotlin, and Clean Architecture principles.
+**Open-Spot** is a microservices platform where users can record and share locations they have visited with ratings, reviews, and memories. Built with Spring Boot 3.5.5, Kotlin, and Clean Architecture principles.
 
-### Target: Seoul cafe/restaurant entrepreneurs need data-driven location analysis with A-F scoring based on competitor density, foot traffic, and sales data.
+### Target: Users can pin locations on a map, record information and ratings for various categories (restaurants, cafes, shopping, parks, entertainment, accommodation), and share their experiences with others.
 
 ## Architecture Overview
 
 ### Microservices (Spring Cloud MSA)
 - **config-service** (9999): Spring Cloud Config Server
 - **gateway-service** (8080): Spring Cloud Gateway with security
-- **auth-service** (8081): Google OAuth2 + JWT authentication  
-- **analysis-service** (8082): PostGIS spatial queries, Redis cache, Kafka events
+- **auth-service** (8081): Google OAuth2 + JWT authentication
+- **location-service** (8082): PostGIS spatial queries, Redis cache, Kafka events
 - **notification-service** (8083): Kafka consumer for async notifications
 
 ### Common Modules (Shared Libraries)
@@ -47,7 +47,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew :config-service:bootRun
 ./gradlew :gateway-service:bootRun
 ./gradlew :auth-service:bootRun
-./gradlew :analysis-service:bootRun
+./gradlew :location-service:bootRun
 
 # Test by service and layer (TDD approach)
 ./gradlew :auth-service:test                    # Full service test
@@ -57,7 +57,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew :auth-service:test --tests="**/controller/**"  # Presentation layer only
 
 # Continuous TDD development
-./gradlew :auth-service:test --tests="UserTest" --continuous
+./gradlew :location-service:test --tests="LocationTest" --continuous
 
 # Build and test all services
 ./gradlew build
@@ -68,12 +68,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Through Gateway (port 8080)
 curl http://localhost:8080/api/v1/auth/health
-curl http://localhost:8080/api/v1/stores/health
+curl http://localhost:8080/api/v1/locations/health
 
 # Direct service access
-curl http://localhost:8081/api/v1/auth/health     # Auth service
-curl http://localhost:8082/api/v1/stores/health   # Analysis service
-curl http://localhost:9999/actuator/health        # Config service
+curl http://localhost:8081/api/v1/auth/health         # Auth service
+curl http://localhost:8082/api/v1/locations/health   # Location service
+curl http://localhost:8083/api/v1/notifications/health # Notification service
+curl http://localhost:9999/actuator/health           # Config service
+```
+
+### Swagger UI Access
+```bash
+# API Documentation (Swagger UI)
+http://localhost:8081/swagger-ui.html    # Auth service API docs
+http://localhost:8082/swagger-ui.html    # Location service API docs
+http://localhost:8083/swagger-ui.html    # Notification service API docs
+
+# Through Gateway (if configured)
+http://localhost:8080/auth/swagger-ui.html
+http://localhost:8080/locations/swagger-ui.html
+http://localhost:8080/notifications/swagger-ui.html
 ```
 
 ## Architecture Patterns
@@ -116,7 +130,7 @@ fun getStores(pageable: Pageable): ApiResponse<PageResponse<StoreResponse>>
 ### Security Configuration
 Each service has its own SecurityFilterChain to avoid conflicts:
 - **Auth Service**: OAuth2 login, JWT refresh, public health endpoints
-- **Analysis Service**: JWT authentication, public health endpoints  
+- **Location Service**: JWT authentication, public health and categories endpoints
 - **Gateway Service**: Routes requests, no authentication (delegates to services)
 - **Common Security**: Disabled by default to prevent FilterChain conflicts
 
@@ -151,17 +165,21 @@ fun authenticateWithGoogle(token: String): GoogleUserInfo
 
 ### Event-Driven Communication (Kafka)
 ```kotlin
-// Analysis service publishes events
+// Location service publishes events
 @Component
-class ReportEventPublisher {
-    fun publishReportGenerated(reportId: UUID) {
-        kafkaTemplate.send("report-events", ReportGeneratedEvent(reportId))
+class LocationEventPublisher {
+    fun publishLocationCreated(location: Location) {
+        kafkaTemplate.send("location-events", LocationCreatedEvent(location))
+    }
+
+    fun publishReviewCreated(review: Review) {
+        kafkaTemplate.send("review-events", ReviewCreatedEvent(review))
     }
 }
 
 // Notification service consumes events
-@KafkaListener(topics = ["report-events"])  
-fun handleReportGenerated(event: ReportGeneratedEvent)
+@KafkaListener(topics = ["location-events", "review-events"])
+fun handleLocationEvent(event: LocationEvent)
 ```
 
 ## Database Architecture
@@ -169,17 +187,22 @@ fun handleReportGenerated(event: ReportGeneratedEvent)
 ### Single Database with Service Separation
 - **Database**: `openspot` (PostgreSQL + PostGIS)
 - **Auth tables**: `users`, `refresh_tokens`
-- **Analysis tables**: `stores`, `reports`, `analysis_results`  
+- **Location tables**: `locations`, `reviews`, `location_visits`, `location_stats`
 - **Notification tables**: `notifications`
 
 ### Spatial Queries (PostGIS)
 ```sql
--- Find stores within radius (Analysis Service)
-SELECT * FROM stores 
-WHERE ST_DWithin(
-    location::geography, 
+-- Find locations within radius (Location Service)
+SELECT * FROM location.locations l
+WHERE l.is_active = true
+AND ST_DWithin(
+    l.coordinates::geography,
     ST_SetSRID(ST_MakePoint(?longitude, ?latitude), 4326)::geography,
-    ?radius
+    ?radiusMeters
+)
+ORDER BY ST_Distance(
+    l.coordinates::geography,
+    ST_SetSRID(ST_MakePoint(?longitude, ?latitude), 4326)::geography
 );
 ```
 
@@ -211,8 +234,8 @@ spring:
 Each service has completely isolated test dependencies:
 ```kotlin
 // Service-specific test dependencies
-testImplementation("org.testcontainers:postgresql")     # Analysis Service  
-testImplementation("org.testcontainers:redis")         # Analysis Service
+testImplementation("org.testcontainers:postgresql")     # Location Service
+testImplementation("org.testcontainers:redis")         # Location Service
 testImplementation("org.springframework.security:spring-security-test") # Auth Service
 ```
 
@@ -228,8 +251,8 @@ testImplementation("org.springframework.security:spring-security-test") # Auth S
 Services must start in order:
 1. Docker infrastructure (PostgreSQL, Redis, Kafka)
 2. Config Service (9999) - provides configuration to other services
-3. Gateway Service (8080) - routes requests to domain services  
-4. Domain Services (8081-8083) - Auth, Analysis, Notification
+3. Gateway Service (8080) - routes requests to domain services
+4. Domain Services (8081-8083) - Auth, Location, Notification
 
 ### Database Connection
 ```yaml
@@ -251,14 +274,34 @@ spring:
 
 ### Key API Endpoints
 ```bash
-# Auth Service  
-POST /api/v1/auth/google/login          # Google OAuth2 login
-GET  /api/v1/users/self            # Current user profile
-POST /api/v1/auth/token/refresh  # JWT token refresh
+# Auth Service
+GET  /api/v1/auth/google/login    # Google OAuth2 login
+GET  /api/v1/users/self           # Current user profile
+POST /api/v1/auth/token/refresh   # JWT token refresh
 
-# Analysis Service
-GET  /api/v1/stores?lat={}&lon={}&radius={}  # Find stores in radius (paginated)
-POST /api/v1/reports             # Generate analysis report  
-GET  /api/v1/reports/{id}        # Get specific report
-GET  /api/v1/reports             # User's report history (paginated)
+# Location Service
+GET    /api/v1/categories         # Available categories
+POST   /api/v1/locations          # Create new location
+GET    /api/v1/locations/{id}     # Get location details (increments view count)
+PUT    /api/v1/locations/{id}     # Update location info
+DELETE /api/v1/locations/{id}     # Deactivate location
+GET    /api/v1/locations/search   # Search locations by various criteria
+GET    /api/v1/locations/popular  # Popular locations by views
+GET    /api/v1/locations/my       # User's created locations
+
+# Reviews
+POST   /api/v1/locations/{id}/reviews     # Create review
+GET    /api/v1/locations/{id}/reviews     # Get location reviews
+GET    /api/v1/reviews/{id}               # Get specific review
+PUT    /api/v1/reviews/{id}               # Update review
+DELETE /api/v1/reviews/{id}               # Delete review
+POST   /api/v1/reviews/{id}/helpful       # Mark review helpful
+POST   /api/v1/reviews/{id}/report        # Report review
+
+# Visits & Favorites
+POST   /api/v1/locations/{id}/visits      # Record visit
+PUT    /api/v1/visits/{id}                # Update visit info
+POST   /api/v1/locations/{id}/favorite/toggle  # Toggle favorite
+GET    /api/v1/users/self/visits          # User's visit history
+GET    /api/v1/users/self/favorites       # User's favorite locations
 ```

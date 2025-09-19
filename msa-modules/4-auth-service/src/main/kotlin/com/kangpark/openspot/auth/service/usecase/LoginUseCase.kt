@@ -41,24 +41,27 @@ class LoginUseCase(
         val googleUserInfo = googleOAuthClient.extractUserInfoSync(oauth2User)
         
         // 2. 사용자 등록 또는 업데이트 (Domain Service 사용)
-        val isNewUser = !authDomainService.userRepository.existsBySocialId(googleUserInfo.socialId)
-        val user = authDomainService.registerOrUpdateUser(
-            socialId = googleUserInfo.socialId,
-            email = googleUserInfo.email,
-            name = googleUserInfo.name,
-            pictureUrl = googleUserInfo.pictureUrl
-        )
-        
-        // 3. 소셜 계정 정보 등록 또는 업데이트
-        authDomainService.registerOrUpdateSocialAccount(
-            userId = user.id,
-            provider = SocialProvider.GOOGLE,
-            providerId = googleUserInfo.socialId,
-            email = googleUserInfo.email,
-            displayName = googleUserInfo.name,
-            profileImageUrl = googleUserInfo.pictureUrl
-        )
-        
+        var user: User? = authDomainService.findUserBySocialAccount(SocialProvider.GOOGLE, googleUserInfo.socialId)
+        val isNewUser: Boolean = (user == null)
+        if (user == null) {
+            user = authDomainService.registerUser(
+                socialId = googleUserInfo.socialId,
+                email = googleUserInfo.email,
+                name = googleUserInfo.name,
+                pictureUrl = googleUserInfo.pictureUrl
+            )
+
+            // 3. 소셜 계정 정보 등록 또는 업데이트
+            authDomainService.registerSocialAccount(
+                userId = user.id,
+                provider = SocialProvider.GOOGLE,
+                providerId = googleUserInfo.socialId,
+                email = googleUserInfo.email,
+                displayName = googleUserInfo.name,
+                profileImageUrl = googleUserInfo.pictureUrl
+            )
+        }
+
         // 4. JWT 액세스 토큰 생성
         val accessToken = jwtTokenProvider.generateAccessToken(
             userId = user.id,

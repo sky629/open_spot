@@ -28,9 +28,9 @@ AUTH_PID=$!
 
 sleep 5
 
-echo "📊 Starting Analysis Service..."
-./gradlew :analysis-service:bootRun --quiet > logs/analysis-service.log 2>&1  &
-ANALYSIS_PID=$!
+echo "📊 Starting Location Service..."
+./gradlew :location-service:bootRun --quiet > logs/location-service.log 2>&1  &
+LOCATION_PID=$!
 
 sleep 5
 
@@ -42,12 +42,12 @@ echo "✅ All domain services started!"
 echo ""
 echo "📋 Service PIDs:"
 echo "  - Auth Service: $AUTH_PID"
-echo "  - Analysis Service: $ANALYSIS_PID"
+echo "  - Location Service: $LOCATION_PID"
 echo "  - Notification Service: $NOTIFICATION_PID"
 echo ""
 echo "📋 Service URLs:"
 echo "  - Auth Service: http://localhost:8081"
-echo "  - Analysis Service: http://localhost:8082"  
+echo "  - Location Service: http://localhost:8082"
 echo "  - Notification Service: http://localhost:8083"
 echo "  - Gateway (All APIs): http://localhost:8080"
 echo ""
