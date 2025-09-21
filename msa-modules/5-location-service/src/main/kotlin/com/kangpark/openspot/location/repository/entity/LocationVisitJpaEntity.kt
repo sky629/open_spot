@@ -1,7 +1,7 @@
 package com.kangpark.openspot.location.repository.entity
 
-import com.kangpark.openspot.location.domain.LocationVisit
-import com.kangpark.openspot.location.domain.VisitPurpose
+import com.kangpark.openspot.location.domain.entity.LocationVisit
+import com.kangpark.openspot.location.domain.valueobject.VisitPurpose
 import jakarta.persistence.*
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.annotations.UuidGenerator

@@ -1,10 +1,11 @@
 package com.kangpark.openspot.location.controller
 
 import com.kangpark.openspot.common.web.dto.ApiResponse
+import com.kangpark.openspot.common.web.dto.PageInfo
 import com.kangpark.openspot.common.web.dto.PageResponse
-import com.kangpark.openspot.location.controller.dto.*
-import com.kangpark.openspot.location.domain.Rating
-import com.kangpark.openspot.location.service.ReviewService
+import com.kangpark.openspot.location.controller.dto.response.*
+import com.kangpark.openspot.location.domain.valueobject.Rating
+import com.kangpark.openspot.location.service.LocationApplicationService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -21,7 +22,7 @@ import java.util.*
 @RestController
 @RequestMapping("/api/v1")
 class ReviewController(
-    private val reviewService: ReviewService
+    private val locationApplicationService: LocationApplicationService
 ) {
     private val logger = LoggerFactory.getLogger(ReviewController::class.java)
 
@@ -36,7 +37,7 @@ class ReviewController(
     ): ResponseEntity<ApiResponse<ReviewResponse>> {
         return try {
             val rating = Rating(request.rating)
-            val review = reviewService.createReview(
+            val review = locationApplicationService.createReview(
                 locationId = locationId,
                 userId = userId,
                 rating = rating,
@@ -79,7 +80,7 @@ class ReviewController(
         @Parameter(description = "사용자 ID (선택사항)")
         @RequestHeader(value = "X-User-Id", required = false) userId: UUID?
     ): ResponseEntity<ApiResponse<ReviewResponse>> {
-        val review = reviewService.getReviewById(reviewId)
+        val review = locationApplicationService.getReviewById(reviewId)
             ?: return ResponseEntity.notFound().build()
 
         val response = ReviewResponse.from(review, userId)
@@ -101,31 +102,41 @@ class ReviewController(
     ): ResponseEntity<ApiResponse<PageResponse<ReviewSummaryResponse>>> {
         val reviewPage = when {
             filter.minRating != null -> {
-                reviewService.getReviewsByLocationAndMinRating(
+                locationApplicationService.getReviewsByLocationAndMinRating(
                     locationId, Rating(filter.minRating), pageable
                 )
             }
             filter.maxRating != null -> {
-                reviewService.getReviewsByLocationAndMaxRating(
+                locationApplicationService.getReviewsByLocationAndMaxRating(
                     locationId, Rating(filter.maxRating), pageable
                 )
             }
             filter.hasImages == true -> {
-                reviewService.getReviewsWithImagesByLocation(locationId, pageable)
+                locationApplicationService.getReviewsWithImagesByLocation(locationId, pageable)
             }
             sortBy == ReviewSortType.HIGHEST_RATING -> {
-                reviewService.getReviewsByLocationOrderByRating(locationId, pageable)
+                locationApplicationService.getReviewsByLocationOrderByRating(locationId, pageable)
             }
             sortBy == ReviewSortType.MOST_HELPFUL -> {
-                reviewService.getReviewsByLocationOrderByHelpful(locationId, pageable)
+                locationApplicationService.getReviewsByLocationOrderByHelpful(locationId, pageable)
             }
             else -> {
-                reviewService.getReviewsByLocation(locationId, pageable)
+                locationApplicationService.getReviewsByLocation(locationId, pageable)
             }
         }
 
         val responseList = reviewPage.content.map { ReviewSummaryResponse.from(it) }
-        val pageResponse = PageResponse.from(reviewPage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = reviewPage.number,
+                size = reviewPage.size,
+                totalElements = reviewPage.totalElements,
+                totalPages = reviewPage.totalPages,
+                first = reviewPage.isFirst,
+                last = reviewPage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
@@ -136,9 +147,19 @@ class ReviewController(
         @RequestHeader("X-User-Id") userId: UUID,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<ReviewResponse>>> {
-        val reviewPage = reviewService.getReviewsByUser(userId, pageable)
+        val reviewPage = locationApplicationService.getReviewsByUser(userId, pageable)
         val responseList = reviewPage.content.map { ReviewResponse.from(it, userId) }
-        val pageResponse = PageResponse.from(reviewPage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = reviewPage.number,
+                size = reviewPage.size,
+                totalElements = reviewPage.totalElements,
+                totalPages = reviewPage.totalPages,
+                first = reviewPage.isFirst,
+                last = reviewPage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
@@ -153,7 +174,7 @@ class ReviewController(
     ): ResponseEntity<ApiResponse<ReviewResponse>> {
         return try {
             val rating = Rating(request.rating)
-            val review = reviewService.updateReview(
+            val review = locationApplicationService.updateReview(
                 reviewId = reviewId,
                 userId = userId,
                 rating = rating,
@@ -197,7 +218,7 @@ class ReviewController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<Map<String, Any>>> {
         return try {
-            reviewService.deleteReview(reviewId, userId)
+            locationApplicationService.deleteReview(reviewId, userId)
 
             val response = mapOf(
                 "reviewId" to reviewId,
@@ -238,7 +259,7 @@ class ReviewController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<Map<String, Any>>> {
         return try {
-            val review = reviewService.toggleHelpful(reviewId, userId, request.isHelpful)
+            val review = locationApplicationService.toggleHelpful(reviewId, userId, request.isHelpful)
 
             val response = mapOf(
                 "reviewId" to reviewId,
@@ -279,7 +300,7 @@ class ReviewController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<Map<String, Any>>> {
         return try {
-            val review = reviewService.reportReview(reviewId, userId)
+            val review = locationApplicationService.reportReview(reviewId, userId)
 
             val response = mapOf(
                 "reviewId" to reviewId,
@@ -317,7 +338,7 @@ class ReviewController(
         @Parameter(description = "장소 ID", required = true)
         @PathVariable locationId: UUID
     ): ResponseEntity<ApiResponse<ReviewStatsResponse>> {
-        val stats = reviewService.getReviewStats(locationId)
+        val stats = locationApplicationService.getReviewStats(locationId)
         val response = ReviewStatsResponse(
             locationId = stats.locationId,
             totalReviews = stats.totalReviews,
@@ -334,7 +355,7 @@ class ReviewController(
         @Parameter(description = "장소 ID", required = true)
         @PathVariable locationId: UUID
     ): ResponseEntity<ApiResponse<List<RatingDistributionResponse>>> {
-        val ratingDistribution = reviewService.getRatingDistributionByLocation(locationId)
+        val ratingDistribution = locationApplicationService.getRatingDistributionByLocation(locationId)
         val response = RatingDistributionResponse.from(ratingDistribution)
         return ResponseEntity.ok(ApiResponse.success(response))
     }
@@ -344,9 +365,19 @@ class ReviewController(
     fun getRecentReviews(
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<ReviewSummaryResponse>>> {
-        val reviewPage = reviewService.getRecentReviews(pageable)
+        val reviewPage = locationApplicationService.getRecentReviews(pageable)
         val responseList = reviewPage.content.map { ReviewSummaryResponse.from(it) }
-        val pageResponse = PageResponse.from(reviewPage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = reviewPage.number,
+                size = reviewPage.size,
+                totalElements = reviewPage.totalElements,
+                totalPages = reviewPage.totalPages,
+                first = reviewPage.isFirst,
+                last = reviewPage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 }

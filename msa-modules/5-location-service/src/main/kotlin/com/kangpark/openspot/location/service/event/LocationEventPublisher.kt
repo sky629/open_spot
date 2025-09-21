@@ -1,8 +1,8 @@
 package com.kangpark.openspot.location.service.event
 
-import com.kangpark.openspot.location.domain.Location
-import com.kangpark.openspot.location.domain.Review
-import com.kangpark.openspot.location.domain.LocationVisit
+import com.kangpark.openspot.location.domain.entity.Location
+import com.kangpark.openspot.location.domain.entity.Review
+import com.kangpark.openspot.location.domain.entity.LocationVisit
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component

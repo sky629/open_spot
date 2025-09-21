@@ -1,8 +1,8 @@
 package com.kangpark.openspot.location.repository
 
-import com.kangpark.openspot.location.domain.CategoryType
-import com.kangpark.openspot.location.domain.Location
-import com.kangpark.openspot.location.domain.LocationRepository
+import com.kangpark.openspot.location.domain.valueobject.CategoryType
+import com.kangpark.openspot.location.domain.entity.Location
+import com.kangpark.openspot.location.domain.repository.LocationRepository
 import com.kangpark.openspot.location.repository.entity.LocationJpaEntity
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
@@ -32,7 +32,7 @@ class LocationRepositoryImpl(
     }
 
     override fun findById(id: UUID): Location? {
-        return locationJpaRepository.findById(id)?.toDomain()
+        return locationJpaRepository.findById(id).map { it.toDomain() }.orElse(null)
     }
 
     override fun deleteById(id: UUID) {
@@ -46,19 +46,17 @@ class LocationRepositoryImpl(
         category: CategoryType?,
         pageable: Pageable
     ): Page<Location> {
-        val jpaPage = if (category != null) {
-            // 카테고리 필터링이 있는 경우 별도 쿼리 필요
-            locationJpaRepository.findByCoordinatesWithinRadius(latitude, longitude, radiusMeters, pageable)
-                .filter { it.category == category }
-                .let {
-                    val content = it.content.filter { entity -> entity.category == category }
-                    PageImpl(content, pageable, content.size.toLong())
-                }
+        val jpaPage = locationJpaRepository.findByCoordinatesWithinRadius(latitude, longitude, radiusMeters, pageable)
+
+        // 카테고리 필터링이 필요한 경우
+        val filteredPage = if (category != null) {
+            val filteredContent = jpaPage.content.filter { it.category == category }
+            PageImpl(filteredContent, pageable, filteredContent.size.toLong())
         } else {
-            locationJpaRepository.findByCoordinatesWithinRadius(latitude, longitude, radiusMeters, pageable)
+            jpaPage
         }
 
-        return jpaPage.map { it.toDomain() }
+        return filteredPage.map { it.toDomain() }
     }
 
     override fun findByCategory(category: CategoryType, pageable: Pageable): Page<Location> {

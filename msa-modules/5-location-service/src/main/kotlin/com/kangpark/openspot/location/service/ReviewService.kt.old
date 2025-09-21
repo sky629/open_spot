@@ -1,0 +1,346 @@
+package com.kangpark.openspot.location.service
+
+import com.kangpark.openspot.location.domain.Rating
+import com.kangpark.openspot.location.domain.Review
+import com.kangpark.openspot.location.domain.ReviewStatus
+import com.kangpark.openspot.location.domain.LocationRepository
+import com.kangpark.openspot.location.repository.ReviewRepository
+import com.kangpark.openspot.location.service.event.LocationEventPublisher
+import org.slf4j.LoggerFactory
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
+import java.util.*
+
+@Service
+@Transactional(readOnly = true)
+class ReviewService(
+    private val reviewRepository: ReviewRepository,
+    private val locationRepository: LocationRepository,
+    private val locationEventPublisher: LocationEventPublisher
+) {
+    private val logger = LoggerFactory.getLogger(ReviewService::class.java)
+
+    /**
+     * 리뷰 생성
+     */
+    @Transactional
+    fun createReview(
+        locationId: UUID,
+        userId: UUID,
+        rating: Rating,
+        content: String,
+        visitedDate: LocalDate? = null,
+        imageUrls: List<String> = emptyList()
+    ): Review {
+        logger.info("Creating review: locationId={}, userId={}, rating={}", locationId, userId, rating.score)
+
+        // 장소 존재 및 활성 상태 확인
+        val location = locationRepository.findById(locationId)
+            ?: throw IllegalArgumentException("Location not found: $locationId")
+        require(location.isActive) { "Cannot review inactive location" }
+
+        // 기존 리뷰 중복 확인 (한 사용자가 같은 장소에 여러 리뷰 금지)
+        val existingReview = reviewRepository.findByLocationIdAndUserIdAndStatus(
+            locationId, userId, ReviewStatus.ACTIVE
+        )
+        require(existingReview == null) { "User already has an active review for this location" }
+
+        // 리뷰 생성
+        val review = Review.create(
+            locationId = locationId,
+            userId = userId,
+            rating = rating,
+            content = content,
+            visitedDate = visitedDate
+        )
+
+        // 이미지 추가
+        imageUrls.take(5).forEach { imageUrl ->
+            review.addImage(imageUrl)
+        }
+
+        val savedReview = reviewRepository.save(review)
+
+        // 리뷰 생성 이벤트 발행 (장소 평점 업데이트는 DB 트리거에서 자동 처리)
+        locationEventPublisher.publishReviewCreated(savedReview)
+
+        logger.info("Review created successfully: id={}", savedReview.id)
+        return savedReview
+    }
+
+    /**
+     * 리뷰 조회
+     */
+    fun getReviewById(reviewId: UUID): Review? {
+        return reviewRepository.findById(reviewId)
+            .filter { it.isActive() }
+            .orElse(null)
+    }
+
+    /**
+     * 특정 장소의 리뷰 목록 (최신순)
+     */
+    fun getReviewsByLocation(locationId: UUID, pageable: Pageable): Page<Review> {
+        return reviewRepository.findByLocationIdAndStatusOrderByCreatedAtDesc(
+            locationId, ReviewStatus.ACTIVE, pageable
+        )
+    }
+
+    /**
+     * 특정 장소의 리뷰 목록 (평점순)
+     */
+    fun getReviewsByLocationOrderByRating(locationId: UUID, pageable: Pageable): Page<Review> {
+        return reviewRepository.findByLocationIdAndStatusOrderByRatingDesc(
+            locationId, ReviewStatus.ACTIVE, pageable
+        )
+    }
+
+    /**
+     * 특정 장소의 리뷰 목록 (도움이 되었어요 순)
+     */
+    fun getReviewsByLocationOrderByHelpful(locationId: UUID, pageable: Pageable): Page<Review> {
+        return reviewRepository.findByLocationIdAndStatusOrderByHelpfulCountDescCreatedAtDesc(
+            locationId, ReviewStatus.ACTIVE, pageable
+        )
+    }
+
+    /**
+     * 특정 사용자의 리뷰 목록
+     */
+    fun getReviewsByUser(userId: UUID, pageable: Pageable): Page<Review> {
+        return reviewRepository.findByUserIdAndStatusOrderByCreatedAtDesc(
+            userId, ReviewStatus.ACTIVE, pageable
+        )
+    }
+
+    /**
+     * 특정 평점 이상의 리뷰 목록
+     */
+    fun getReviewsByLocationAndMinRating(
+        locationId: UUID,
+        minRating: Rating,
+        pageable: Pageable
+    ): Page<Review> {
+        return reviewRepository.findByLocationIdAndMinRating(
+            locationId, minRating.score, pageable
+        )
+    }
+
+    /**
+     * 특정 평점 이하의 리뷰 목록
+     */
+    fun getReviewsByLocationAndMaxRating(
+        locationId: UUID,
+        maxRating: Rating,
+        pageable: Pageable
+    ): Page<Review> {
+        return reviewRepository.findByLocationIdAndMaxRating(
+            locationId, maxRating.score, pageable
+        )
+    }
+
+    /**
+     * 이미지가 있는 리뷰 목록
+     */
+    fun getReviewsWithImagesByLocation(locationId: UUID, pageable: Pageable): Page<Review> {
+        return reviewRepository.findByLocationIdWithImages(locationId, pageable)
+    }
+
+    /**
+     * 리뷰 수정
+     */
+    @Transactional
+    fun updateReview(
+        reviewId: UUID,
+        userId: UUID,
+        rating: Rating,
+        content: String,
+        visitedDate: LocalDate? = null,
+        imageUrls: List<String> = emptyList()
+    ): Review {
+        val review = reviewRepository.findById(reviewId).orElseThrow {
+            IllegalArgumentException("Review not found: $reviewId")
+        }
+
+        require(review.canBeEditedBy(userId)) { "User cannot edit this review" }
+
+        // 리뷰 내용 업데이트
+        review.updateReview(rating, content, visitedDate)
+
+        // 이미지 업데이트
+        review.clearImages()
+        imageUrls.take(5).forEach { imageUrl ->
+            review.addImage(imageUrl)
+        }
+
+        val updatedReview = reviewRepository.save(review)
+
+        // 리뷰 업데이트 이벤트 발행
+        locationEventPublisher.publishReviewUpdated(updatedReview)
+
+        logger.info("Review updated successfully: id={}", reviewId)
+        return updatedReview
+    }
+
+    /**
+     * 리뷰 삭제 (논리적 삭제)
+     */
+    @Transactional
+    fun deleteReview(reviewId: UUID, userId: UUID): Review {
+        val review = reviewRepository.findById(reviewId).orElseThrow {
+            IllegalArgumentException("Review not found: $reviewId")
+        }
+
+        require(review.canBeEditedBy(userId)) { "User cannot delete this review" }
+
+        review.delete()
+        val deletedReview = reviewRepository.save(review)
+
+        // 리뷰 삭제 이벤트 발행
+        locationEventPublisher.publishReviewDeleted(deletedReview)
+
+        logger.info("Review deleted successfully: id={}", reviewId)
+        return deletedReview
+    }
+
+    /**
+     * 도움이 되었어요 토글
+     */
+    @Transactional
+    fun toggleHelpful(reviewId: UUID, userId: UUID, isHelpful: Boolean): Review {
+        val review = reviewRepository.findById(reviewId).orElseThrow {
+            IllegalArgumentException("Review not found: $reviewId")
+        }
+
+        require(review.isActive()) { "Cannot interact with inactive review" }
+        require(review.userId != userId) { "Cannot vote on your own review" }
+
+        // 실제로는 사용자별 helpful 투표 기록을 별도 테이블에 저장해야 하지만,
+        // 여기서는 단순하게 카운트만 증감
+        if (isHelpful) {
+            review.incrementHelpfulCount()
+        } else {
+            review.decrementHelpfulCount()
+        }
+
+        val updatedReview = reviewRepository.save(review)
+        logger.info("Review helpful toggled: reviewId={}, isHelpful={}", reviewId, isHelpful)
+        return updatedReview
+    }
+
+    /**
+     * 리뷰 신고
+     */
+    @Transactional
+    fun reportReview(reviewId: UUID, userId: UUID): Review {
+        val review = reviewRepository.findById(reviewId).orElseThrow {
+            IllegalArgumentException("Review not found: $reviewId")
+        }
+
+        require(review.isActive()) { "Cannot report inactive review" }
+        require(review.userId != userId) { "Cannot report your own review" }
+
+        review.incrementReportedCount()
+        val reportedReview = reviewRepository.save(review)
+
+        logger.info("Review reported: reviewId={}, reportedBy={}, totalReports={}",
+                   reviewId, userId, reportedReview.reportedCount)
+        return reportedReview
+    }
+
+    /**
+     * 리뷰 숨김 처리 (관리자용)
+     */
+    @Transactional
+    fun hideReview(reviewId: UUID): Review {
+        val review = reviewRepository.findById(reviewId).orElseThrow {
+            IllegalArgumentException("Review not found: $reviewId")
+        }
+
+        review.hide()
+        val hiddenReview = reviewRepository.save(review)
+
+        logger.info("Review hidden by admin: id={}", reviewId)
+        return hiddenReview
+    }
+
+    /**
+     * 리뷰 활성화 (관리자용)
+     */
+    @Transactional
+    fun activateReview(reviewId: UUID): Review {
+        val review = reviewRepository.findById(reviewId).orElseThrow {
+            IllegalArgumentException("Review not found: $reviewId")
+        }
+
+        review.activate()
+        val activatedReview = reviewRepository.save(review)
+
+        logger.info("Review activated by admin: id={}", reviewId)
+        return activatedReview
+    }
+
+    /**
+     * 장소별 평점 분포 조회
+     */
+    fun getRatingDistributionByLocation(locationId: UUID): Map<Int, Long> {
+        val ratingCounts = reviewRepository.countByLocationIdGroupByRating(locationId)
+
+        // 1-5점 모든 평점에 대해 기본값 0으로 초기화
+        val distribution = (1..5).associateWith { 0L }.toMutableMap()
+
+        // 실제 데이터로 업데이트
+        ratingCounts.forEach { ratingCount ->
+            val rating = ratingCount.rating.toInt()
+            distribution[rating] = ratingCount.count
+        }
+
+        return distribution
+    }
+
+    /**
+     * 최근 리뷰 목록 (전체)
+     */
+    fun getRecentReviews(pageable: Pageable): Page<Review> {
+        return reviewRepository.findByStatusOrderByCreatedAtDesc(ReviewStatus.ACTIVE, pageable)
+    }
+
+    /**
+     * 신고가 많은 리뷰 목록 (관리자용)
+     */
+    fun getHighlyReportedReviews(pageable: Pageable): Page<Review> {
+        return reviewRepository.findHighlyReportedReviews(3L, pageable)
+    }
+
+    /**
+     * 리뷰 통계 정보
+     */
+    fun getReviewStats(locationId: UUID): ReviewStatsInfo {
+        val totalReviews = reviewRepository.countByLocationIdAndStatus(locationId, ReviewStatus.ACTIVE)
+        val averageRating = reviewRepository.calculateAverageRatingByLocationId(locationId)
+        val ratingDistribution = getRatingDistributionByLocation(locationId)
+        val reviewsWithImages = reviewRepository.findByLocationIdWithImages(
+            locationId,
+            org.springframework.data.domain.PageRequest.of(0, 1)
+        ).totalElements
+
+        return ReviewStatsInfo(
+            locationId = locationId,
+            totalReviews = totalReviews,
+            averageRating = averageRating?.let { Rating(it) },
+            ratingDistribution = ratingDistribution,
+            reviewsWithImagesCount = reviewsWithImages
+        )
+    }
+
+    data class ReviewStatsInfo(
+        val locationId: UUID,
+        val totalReviews: Long,
+        val averageRating: Rating?,
+        val ratingDistribution: Map<Int, Long>,
+        val reviewsWithImagesCount: Long
+    )
+}

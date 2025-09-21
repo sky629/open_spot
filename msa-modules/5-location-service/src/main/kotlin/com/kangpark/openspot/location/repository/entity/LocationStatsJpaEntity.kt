@@ -1,7 +1,7 @@
 package com.kangpark.openspot.location.repository.entity
 
-import com.kangpark.openspot.location.domain.LocationStats
-import com.kangpark.openspot.location.domain.StatsType
+import com.kangpark.openspot.location.domain.entity.LocationStats
+import com.kangpark.openspot.location.domain.entity.StatsType
 import jakarta.persistence.*
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.annotations.UuidGenerator

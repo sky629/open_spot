@@ -1,8 +1,9 @@
 package com.kangpark.openspot.location.repository.entity
 
-import com.kangpark.openspot.location.domain.CategoryType
-import com.kangpark.openspot.location.domain.Coordinates
-import com.kangpark.openspot.location.domain.Location
+import com.kangpark.openspot.common.core.domain.BaseEntity
+import com.kangpark.openspot.location.domain.valueobject.CategoryType
+import com.kangpark.openspot.location.domain.valueobject.Coordinates
+import com.kangpark.openspot.location.domain.entity.Location
 import jakarta.persistence.*
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.annotations.UuidGenerator
@@ -145,8 +146,8 @@ class LocationJpaEntity(
                 description = location.description,
                 address = location.address,
                 category = location.category,
-                latitude = location.coordinates.latitude,
-                longitude = location.coordinates.longitude,
+                latitude = location.coordinates.latitude.toDouble(),
+                longitude = location.coordinates.longitude.toDouble(),
                 createdBy = location.createdBy,
                 phoneNumber = location.phoneNumber,
                 websiteUrl = location.websiteUrl,
@@ -181,8 +182,8 @@ class LocationJpaEntity(
                 description = location.description,
                 address = location.address,
                 category = location.category,
-                latitude = location.coordinates.latitude,
-                longitude = location.coordinates.longitude,
+                latitude = location.coordinates.latitude.toDouble(),
+                longitude = location.coordinates.longitude.toDouble(),
                 createdBy = location.createdBy,
                 phoneNumber = location.phoneNumber,
                 websiteUrl = location.websiteUrl,
@@ -196,4 +197,5 @@ class LocationJpaEntity(
             )
         }
     }
+
 }

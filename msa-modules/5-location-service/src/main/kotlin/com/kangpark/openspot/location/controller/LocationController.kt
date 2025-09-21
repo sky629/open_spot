@@ -1,11 +1,13 @@
 package com.kangpark.openspot.location.controller
 
 import com.kangpark.openspot.common.web.dto.ApiResponse
+import com.kangpark.openspot.common.web.dto.PageInfo
 import com.kangpark.openspot.common.web.dto.PageResponse
-import com.kangpark.openspot.location.controller.dto.*
-import com.kangpark.openspot.location.domain.CategoryType
-import com.kangpark.openspot.location.domain.Rating
-import com.kangpark.openspot.location.service.LocationService
+import com.kangpark.openspot.location.controller.dto.response.*
+import com.kangpark.openspot.location.domain.valueobject.CategoryType
+import com.kangpark.openspot.location.domain.valueobject.Coordinates
+import com.kangpark.openspot.location.domain.valueobject.Rating
+import com.kangpark.openspot.location.service.LocationApplicationService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -22,7 +24,7 @@ import java.util.*
 @RestController
 @RequestMapping("/api/v1/locations")
 class LocationController(
-    private val locationService: LocationService
+    private val locationApplicationService: LocationApplicationService
 ) {
     private val logger = LoggerFactory.getLogger(LocationController::class.java)
 
@@ -34,7 +36,7 @@ class LocationController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<LocationResponse>> {
         return try {
-            val location = locationService.createLocation(
+            val location = locationApplicationService.createLocation(
                 name = request.name,
                 description = request.description,
                 address = request.address,
@@ -80,7 +82,7 @@ class LocationController(
         @Parameter(description = "사용자 ID (선택사항)")
         @RequestHeader(value = "X-User-Id", required = false) userId: UUID?
     ): ResponseEntity<ApiResponse<LocationResponse>> {
-        val location = locationService.getLocationById(locationId, userId)
+        val location = locationApplicationService.getLocationById(locationId, userId)
             ?: return ResponseEntity.notFound().build()
 
         val response = LocationResponse.from(location)
@@ -97,7 +99,7 @@ class LocationController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<LocationResponse>> {
         return try {
-            val location = locationService.updateLocation(
+            val location = locationApplicationService.updateLocation(
                 locationId = locationId,
                 userId = userId,
                 name = request.name,
@@ -145,7 +147,7 @@ class LocationController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<LocationResponse>> {
         return try {
-            val location = locationService.updateLocationCoordinates(
+            val location = locationApplicationService.updateLocationCoordinates(
                 locationId = locationId,
                 userId = userId,
                 coordinates = request.toCoordinates()
@@ -186,7 +188,7 @@ class LocationController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<Map<String, Any>>> {
         return try {
-            locationService.deactivateLocation(locationId, userId)
+            locationApplicationService.deactivateLocation(locationId, userId)
 
             val response = mapOf(
                 "locationId" to locationId,
@@ -227,7 +229,7 @@ class LocationController(
         val locationPage = when {
             // 반경 검색
             request.latitude != null && request.longitude != null && request.radiusMeters != null -> {
-                locationService.searchLocationsByRadius(
+                locationApplicationService.searchLocationsByRadius(
                     latitude = request.latitude,
                     longitude = request.longitude,
                     radiusMeters = request.radiusMeters,
@@ -237,22 +239,22 @@ class LocationController(
             }
             // 카테고리 검색
             request.category != null -> {
-                locationService.getLocationsByCategory(request.category, pageable)
+                locationApplicationService.getLocationsByCategory(request.category, pageable)
             }
             // 키워드 검색
             !request.keyword.isNullOrBlank() -> {
-                locationService.searchLocationsByKeyword(request.keyword, pageable)
+                locationApplicationService.searchLocationsByKeyword(request.keyword, pageable)
             }
             // 기본: 최근 등록순
             else -> {
-                locationService.getRecentLocations(pageable)
+                locationApplicationService.getRecentLocations(pageable)
             }
         }
 
         val responseList = locationPage.content.map { location ->
             val distance = if (request.latitude != null && request.longitude != null) {
                 location.distanceTo(
-                    com.kangpark.openspot.location.domain.Coordinates.of(
+                    Coordinates.of(
                         request.latitude, request.longitude
                     )
                 )
@@ -261,7 +263,17 @@ class LocationController(
             LocationSummaryResponse.from(location, distance)
         }
 
-        val pageResponse = PageResponse.from(locationPage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = locationPage.number,
+                size = locationPage.size,
+                totalElements = locationPage.totalElements,
+                totalPages = locationPage.totalPages,
+                first = locationPage.isFirst,
+                last = locationPage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
@@ -270,9 +282,19 @@ class LocationController(
     fun getPopularLocations(
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val locationPage = locationService.getPopularLocations(pageable)
+        val locationPage = locationApplicationService.getPopularLocations(pageable)
         val responseList = locationPage.content.map { LocationSummaryResponse.from(it) }
-        val pageResponse = PageResponse.from(locationPage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = locationPage.number,
+                size = locationPage.size,
+                totalElements = locationPage.totalElements,
+                totalPages = locationPage.totalPages,
+                first = locationPage.isFirst,
+                last = locationPage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
@@ -281,9 +303,19 @@ class LocationController(
     fun getTopRatedLocations(
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val locationPage = locationService.getTopRatedLocations(pageable)
+        val locationPage = locationApplicationService.getTopRatedLocations(pageable)
         val responseList = locationPage.content.map { LocationSummaryResponse.from(it) }
-        val pageResponse = PageResponse.from(locationPage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = locationPage.number,
+                size = locationPage.size,
+                totalElements = locationPage.totalElements,
+                totalPages = locationPage.totalPages,
+                first = locationPage.isFirst,
+                last = locationPage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
@@ -292,9 +324,19 @@ class LocationController(
     fun getRecentLocations(
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val locationPage = locationService.getRecentLocations(pageable)
+        val locationPage = locationApplicationService.getRecentLocations(pageable)
         val responseList = locationPage.content.map { LocationSummaryResponse.from(it) }
-        val pageResponse = PageResponse.from(locationPage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = locationPage.number,
+                size = locationPage.size,
+                totalElements = locationPage.totalElements,
+                totalPages = locationPage.totalPages,
+                first = locationPage.isFirst,
+                last = locationPage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
@@ -305,16 +347,26 @@ class LocationController(
         @RequestHeader("X-User-Id") userId: UUID,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val locationPage = locationService.getLocationsByUser(userId, pageable)
+        val locationPage = locationApplicationService.getLocationsByUser(userId, pageable)
         val responseList = locationPage.content.map { LocationSummaryResponse.from(it) }
-        val pageResponse = PageResponse.from(locationPage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = locationPage.number,
+                size = locationPage.size,
+                totalElements = locationPage.totalElements,
+                totalPages = locationPage.totalPages,
+                first = locationPage.isFirst,
+                last = locationPage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
     @Operation(summary = "카테고리별 장소 개수", description = "각 카테고리별 활성 장소 개수를 조회합니다.")
     @GetMapping("/categories/stats")
     fun getCategoryStats(): ResponseEntity<ApiResponse<List<CategoryStatsResponse>>> {
-        val categoryStats = locationService.getLocationCountByCategory()
+        val categoryStats = locationApplicationService.getLocationCountByCategory()
         val responseList = categoryStats.map { (category, count) ->
             CategoryStatsResponse.from(category, count)
         }
@@ -328,7 +380,7 @@ class LocationController(
         @PathVariable locationId: UUID
     ): ResponseEntity<ApiResponse<LocationStatsResponse>> {
         return try {
-            val stats = locationService.getLocationStats(locationId)
+            val stats = locationApplicationService.getLocationStats(locationId)
             val response = LocationStatsResponse(
                 locationId = stats.locationId,
                 viewCount = stats.viewCount,

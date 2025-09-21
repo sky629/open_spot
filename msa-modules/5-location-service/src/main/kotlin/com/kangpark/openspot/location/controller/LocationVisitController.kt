@@ -1,10 +1,11 @@
 package com.kangpark.openspot.location.controller
 
 import com.kangpark.openspot.common.web.dto.ApiResponse
+import com.kangpark.openspot.common.web.dto.PageInfo
 import com.kangpark.openspot.common.web.dto.PageResponse
-import com.kangpark.openspot.location.controller.dto.*
-import com.kangpark.openspot.location.domain.VisitPurpose
-import com.kangpark.openspot.location.service.LocationVisitService
+import com.kangpark.openspot.location.controller.dto.response.*
+import com.kangpark.openspot.location.domain.valueobject.VisitPurpose
+import com.kangpark.openspot.location.service.LocationApplicationService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -21,7 +22,7 @@ import java.util.*
 @RestController
 @RequestMapping("/api/v1")
 class LocationVisitController(
-    private val locationVisitService: LocationVisitService
+    private val locationApplicationService: LocationApplicationService
 ) {
     private val logger = LoggerFactory.getLogger(LocationVisitController::class.java)
 
@@ -35,7 +36,7 @@ class LocationVisitController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<LocationVisitResponse>> {
         return try {
-            val visit = locationVisitService.recordVisit(
+            val visit = locationApplicationService.recordVisit(
                 locationId = locationId,
                 userId = userId,
                 visitedAt = request.visitedAt,
@@ -77,7 +78,7 @@ class LocationVisitController(
         @Parameter(description = "방문 기록 ID", required = true)
         @PathVariable visitId: UUID
     ): ResponseEntity<ApiResponse<LocationVisitResponse>> {
-        val visit = locationVisitService.getVisitById(visitId)
+        val visit = locationApplicationService.getVisitById(visitId)
             ?: return ResponseEntity.notFound().build()
 
         val response = LocationVisitResponse.from(visit)
@@ -91,9 +92,19 @@ class LocationVisitController(
         @RequestHeader("X-User-Id") userId: UUID,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationVisitSummaryResponse>>> {
-        val visitPage = locationVisitService.getVisitsByUser(userId, pageable)
+        val visitPage = locationApplicationService.getVisitsByUser(userId, pageable)
         val responseList = visitPage.content.map { LocationVisitSummaryResponse.from(it) }
-        val pageResponse = PageResponse.from(visitPage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = visitPage.number,
+                size = visitPage.size,
+                totalElements = visitPage.totalElements,
+                totalPages = visitPage.totalPages,
+                first = visitPage.isFirst,
+                last = visitPage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
@@ -104,9 +115,19 @@ class LocationVisitController(
         @PathVariable locationId: UUID,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationVisitSummaryResponse>>> {
-        val visitPage = locationVisitService.getVisitsByLocation(locationId, pageable)
+        val visitPage = locationApplicationService.getVisitsByLocation(locationId, pageable)
         val responseList = visitPage.content.map { LocationVisitSummaryResponse.from(it) }
-        val pageResponse = PageResponse.from(visitPage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = visitPage.number,
+                size = visitPage.size,
+                totalElements = visitPage.totalElements,
+                totalPages = visitPage.totalPages,
+                first = visitPage.isFirst,
+                last = visitPage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
@@ -117,9 +138,19 @@ class LocationVisitController(
         @RequestHeader("X-User-Id") userId: UUID,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationVisitSummaryResponse>>> {
-        val favoritePage = locationVisitService.getFavoritesByUser(userId, pageable)
+        val favoritePage = locationApplicationService.getFavoritesByUser(userId, pageable)
         val responseList = favoritePage.content.map { LocationVisitSummaryResponse.from(it) }
-        val pageResponse = PageResponse.from(favoritePage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = favoritePage.number,
+                size = favoritePage.size,
+                totalElements = favoritePage.totalElements,
+                totalPages = favoritePage.totalPages,
+                first = favoritePage.isFirst,
+                last = favoritePage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
@@ -133,7 +164,7 @@ class LocationVisitController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<LocationVisitResponse>> {
         return try {
-            val visit = locationVisitService.updateVisit(
+            val visit = locationApplicationService.updateVisit(
                 visitId = visitId,
                 userId = userId,
                 memo = request.memo,
@@ -177,7 +208,7 @@ class LocationVisitController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<FavoriteToggleResponse>> {
         return try {
-            val visit = locationVisitService.toggleFavorite(locationId, userId)
+            val visit = locationApplicationService.toggleFavorite(locationId, userId)
             val response = FavoriteToggleResponse.from(locationId, visit.isFavorite)
             ResponseEntity.ok(ApiResponse.success(response))
 
@@ -214,7 +245,7 @@ class LocationVisitController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<FavoriteToggleResponse>> {
         return try {
-            val visit = locationVisitService.setFavorite(locationId, userId, request.isFavorite)
+            val visit = locationApplicationService.setFavorite(locationId, userId, request.isFavorite)
             val response = FavoriteToggleResponse.from(locationId, visit.isFavorite)
             ResponseEntity.ok(ApiResponse.success(response))
 
@@ -248,9 +279,19 @@ class LocationVisitController(
         @PathVariable visitPurpose: VisitPurpose,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationVisitSummaryResponse>>> {
-        val visitPage = locationVisitService.getVisitsByPurpose(visitPurpose, pageable)
+        val visitPage = locationApplicationService.getVisitsByPurpose(visitPurpose, pageable)
         val responseList = visitPage.content.map { LocationVisitSummaryResponse.from(it) }
-        val pageResponse = PageResponse.from(visitPage, responseList)
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = visitPage.number,
+                size = visitPage.size,
+                totalElements = visitPage.totalElements,
+                totalPages = visitPage.totalPages,
+                first = visitPage.isFirst,
+                last = visitPage.isLast
+            )
+        )
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
@@ -260,7 +301,7 @@ class LocationVisitController(
         @Parameter(description = "장소 ID", required = true)
         @PathVariable locationId: UUID
     ): ResponseEntity<ApiResponse<VisitStatsResponse>> {
-        val stats = locationVisitService.getVisitStats(locationId)
+        val stats = locationApplicationService.getVisitStats(locationId)
         val response = VisitStatsResponse(
             locationId = stats.locationId,
             totalVisits = stats.totalVisits,
@@ -277,7 +318,7 @@ class LocationVisitController(
         @Parameter(description = "사용자 ID", required = true)
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<UserVisitStatsResponse>> {
-        val stats = locationVisitService.getUserVisitStats(userId)
+        val stats = locationApplicationService.getUserVisitStats(userId)
         val response = UserVisitStatsResponse(
             userId = stats.userId,
             totalVisits = stats.totalVisits,
@@ -292,7 +333,7 @@ class LocationVisitController(
     fun getPopularLocationsByVisits(
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<List<LocationPopularityResponse>>> {
-        val popularLocations = locationVisitService.getPopularLocationsByVisitCount(pageable)
+        val popularLocations = locationApplicationService.getPopularLocationsByVisitCount(pageable)
         val responseList = popularLocations.map {
             LocationPopularityResponse(
                 locationId = it.locationId,
@@ -308,7 +349,7 @@ class LocationVisitController(
     fun getPopularLocationsByVisitors(
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<List<LocationPopularityResponse>>> {
-        val popularLocations = locationVisitService.getPopularLocationsByUniqueVisitors(pageable)
+        val popularLocations = locationApplicationService.getPopularLocationsByUniqueVisitors(pageable)
         val responseList = popularLocations.map {
             LocationPopularityResponse(
                 locationId = it.locationId,
@@ -327,7 +368,7 @@ class LocationVisitController(
         @Parameter(description = "사용자 ID", required = true)
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<Map<String, Boolean>>> {
-        val hasVisited = locationVisitService.hasUserVisited(locationId, userId)
+        val hasVisited = locationApplicationService.hasUserVisited(locationId, userId)
         val response = mapOf("hasVisited" to hasVisited)
         return ResponseEntity.ok(ApiResponse.success(response))
     }

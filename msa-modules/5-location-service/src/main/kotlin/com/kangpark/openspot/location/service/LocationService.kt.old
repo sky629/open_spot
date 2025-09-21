@@ -1,0 +1,331 @@
+package com.kangpark.openspot.location.service
+
+import com.kangpark.openspot.location.domain.*
+import com.kangpark.openspot.location.domain.LocationRepository
+import com.kangpark.openspot.location.repository.LocationVisitRepository
+import com.kangpark.openspot.location.repository.ReviewRepository
+import com.kangpark.openspot.location.service.event.LocationEventPublisher
+import org.slf4j.LoggerFactory
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.Pageable
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.util.*
+
+@Service
+@Transactional(readOnly = true)
+class LocationService(
+    private val locationRepository: LocationRepository,
+    private val reviewRepository: ReviewRepository,
+    private val locationVisitRepository: LocationVisitRepository,
+    private val locationEventPublisher: LocationEventPublisher
+) {
+    private val logger = LoggerFactory.getLogger(LocationService::class.java)
+
+    /**
+     * 새 장소 생성
+     */
+    @Transactional
+    fun createLocation(
+        name: String,
+        description: String?,
+        address: String?,
+        category: CategoryType,
+        coordinates: Coordinates,
+        createdBy: UUID,
+        phoneNumber: String? = null,
+        websiteUrl: String? = null,
+        businessHours: String? = null
+    ): Location {
+        logger.info("Creating new location: name={}, category={}, createdBy={}", name, category, createdBy)
+
+        val location = Location.create(
+            name = name,
+            description = description,
+            address = address,
+            category = category,
+            coordinates = coordinates,
+            createdBy = createdBy,
+            phoneNumber = phoneNumber,
+            websiteUrl = websiteUrl,
+            businessHours = businessHours
+        )
+
+        val savedLocation = locationRepository.save(location)
+
+        // 장소 생성 이벤트 발행
+        locationEventPublisher.publishLocationCreated(savedLocation)
+
+        logger.info("Location created successfully: id={}", savedLocation.id)
+        return savedLocation
+    }
+
+    /**
+     * 장소 정보 조회 (조회수 증가)
+     */
+    @Transactional
+    fun getLocationById(locationId: UUID, userId: UUID? = null): Location? {
+        val location = locationRepository.findById(locationId)
+            ?: return null
+
+        if (!location.isActive) {
+            return null
+        }
+
+        // 조회수 증가
+        location.incrementViewCount()
+        locationRepository.save(location)
+
+        // 조회 이벤트 발행
+        locationEventPublisher.publishLocationViewed(location, userId)
+
+        return location
+    }
+
+    /**
+     * 장소 정보 조회 (조회수 증가 없음)
+     */
+    fun getLocationByIdWithoutIncrement(locationId: UUID): Location? {
+        val location = locationRepository.findById(locationId)
+            ?: return null
+
+        return if (location.isActive) location else null
+    }
+
+    /**
+     * 반경 내 장소 검색
+     */
+    fun searchLocationsByRadius(
+        latitude: Double,
+        longitude: Double,
+        radiusMeters: Double,
+        category: CategoryType? = null,
+        pageable: Pageable
+    ): Page<Location> {
+        return locationRepository.findByCoordinatesWithinRadius(
+            latitude, longitude, radiusMeters, category, pageable
+        )
+    }
+
+    /**
+     * 카테고리별 장소 검색
+     */
+    fun getLocationsByCategory(category: CategoryType, pageable: Pageable): Page<Location> {
+        return locationRepository.findByCategory(category, pageable)
+    }
+
+    /**
+     * 키워드로 장소 검색
+     */
+    fun searchLocationsByKeyword(keyword: String, pageable: Pageable): Page<Location> {
+        return if (keyword.isBlank()) {
+            locationRepository.findRecentLocations(pageable)
+        } else {
+            locationRepository.findByKeyword(keyword.trim(), pageable)
+        }
+    }
+
+    /**
+     * 인기 장소 목록 (조회수 기준)
+     */
+    fun getPopularLocations(pageable: Pageable): Page<Location> {
+        return locationRepository.findPopularLocations(pageable)
+    }
+
+    /**
+     * 최고 평점 장소 목록
+     */
+    fun getTopRatedLocations(pageable: Pageable): Page<Location> {
+        return locationRepository.findTopRatedLocations(pageable)
+    }
+
+    /**
+     * 최근 추가된 장소 목록
+     */
+    fun getRecentLocations(pageable: Pageable): Page<Location> {
+        return locationRepository.findRecentLocations(pageable)
+    }
+
+    /**
+     * 사용자가 생성한 장소 목록
+     */
+    fun getLocationsByUser(userId: UUID, pageable: Pageable): Page<Location> {
+        return locationRepository.findByCreatedBy(userId, pageable)
+    }
+
+    /**
+     * 사용자의 즐겨찾기 장소 목록
+     * TODO: 즐겨찾기 기능 구현 필요
+     */
+    fun getFavoriteLocationsByUser(userId: UUID, pageable: Pageable): Page<Location> {
+        // 현재는 빈 페이지 반환
+        return PageImpl(emptyList(), pageable, 0)
+    }
+
+    /**
+     * 장소 정보 업데이트
+     */
+    @Transactional
+    fun updateLocation(
+        locationId: UUID,
+        userId: UUID,
+        name: String,
+        description: String?,
+        address: String?,
+        category: CategoryType,
+        phoneNumber: String? = null,
+        websiteUrl: String? = null,
+        businessHours: String? = null
+    ): Location {
+        val location = locationRepository.findById(locationId)
+            ?: throw IllegalArgumentException("Location not found: $locationId")
+
+        require(location.isActive) { "Cannot update inactive location" }
+        require(location.createdBy == userId) { "Only location creator can update location" }
+
+        // 기본 정보 업데이트
+        location.updateBasicInfo(name, description, address, category)
+        location.updateContactInfo(phoneNumber, websiteUrl, businessHours)
+
+        val updatedLocation = locationRepository.save(location)
+
+        // 장소 업데이트 이벤트 발행
+        locationEventPublisher.publishLocationUpdated(updatedLocation)
+
+        logger.info("Location updated successfully: id={}", locationId)
+        return updatedLocation
+    }
+
+    /**
+     * 장소 좌표 업데이트
+     */
+    @Transactional
+    fun updateLocationCoordinates(
+        locationId: UUID,
+        userId: UUID,
+        coordinates: Coordinates
+    ): Location {
+        val location = locationRepository.findById(locationId)
+            ?: throw IllegalArgumentException("Location not found: $locationId")
+
+        require(location.isActive) { "Cannot update inactive location" }
+        require(location.createdBy == userId) { "Only location creator can update location coordinates" }
+
+        location.updateCoordinates(coordinates)
+        val updatedLocation = locationRepository.save(location)
+
+        logger.info("Location coordinates updated: id={}, newCoordinates={}", locationId, coordinates)
+        return updatedLocation
+    }
+
+    /**
+     * 장소 비활성화 (논리적 삭제)
+     */
+    @Transactional
+    fun deactivateLocation(locationId: UUID, userId: UUID): Location {
+        val location = locationRepository.findById(locationId)
+            ?: throw IllegalArgumentException("Location not found: $locationId")
+
+        require(location.isActive) { "Location is already inactive" }
+        require(location.createdBy == userId) { "Only location creator can deactivate location" }
+
+        location.deactivate()
+        val deactivatedLocation = locationRepository.save(location)
+
+        // 장소 비활성화 이벤트 발행
+        locationEventPublisher.publishLocationDeactivated(deactivatedLocation)
+
+        logger.info("Location deactivated: id={}", locationId)
+        return deactivatedLocation
+    }
+
+    /**
+     * 장소 활성화
+     */
+    @Transactional
+    fun activateLocation(locationId: UUID, userId: UUID): Location {
+        val location = locationRepository.findById(locationId)
+            ?: throw IllegalArgumentException("Location not found: $locationId")
+
+        require(!location.isActive) { "Location is already active" }
+        require(location.createdBy == userId) { "Only location creator can activate location" }
+
+        location.activate()
+        val activatedLocation = locationRepository.save(location)
+
+        logger.info("Location activated: id={}", locationId)
+        return activatedLocation
+    }
+
+    /**
+     * 특정 좌표에서 가장 가까운 장소들
+     */
+    fun getNearestLocations(
+        latitude: Double,
+        longitude: Double,
+        limit: Int = 10,
+        category: CategoryType? = null
+    ): List<Location> {
+        val maxRadius = 10000.0 // 10km
+        val pageable = org.springframework.data.domain.PageRequest.of(0, limit)
+
+        return locationRepository.findByCoordinatesWithinRadius(
+            latitude, longitude, maxRadius, category, pageable
+        ).content
+    }
+
+    /**
+     * 장소 통계 정보
+     */
+    fun getLocationStats(locationId: UUID): LocationStatsInfo {
+        val location = getLocationByIdWithoutIncrement(locationId)
+            ?: throw IllegalArgumentException("Location not found: $locationId")
+
+        val totalVisits = locationVisitRepository.countByLocationId(locationId)
+        val uniqueVisitors = locationVisitRepository.countUniqueVisitorsByLocationId(locationId)
+        val favoriteCount = locationVisitRepository.countByLocationIdAndIsFavoriteTrue(locationId)
+        val activeReviewCount = reviewRepository.countByLocationIdAndStatus(
+            locationId, ReviewStatus.ACTIVE
+        )
+
+        return LocationStatsInfo(
+            locationId = locationId,
+            viewCount = location.viewCount,
+            visitCount = totalVisits,
+            uniqueVisitorCount = uniqueVisitors,
+            reviewCount = activeReviewCount,
+            averageRating = location.getAverageRatingAsRating(),
+            favoriteCount = favoriteCount
+        )
+    }
+
+    /**
+     * 카테고리별 장소 개수
+     */
+    fun getLocationCountByCategory(): Map<CategoryType, Long> {
+        return locationRepository.countByCategory()
+    }
+
+    /**
+     * 반경 내 장소 개수
+     */
+    fun getLocationCountInRadius(
+        latitude: Double,
+        longitude: Double,
+        radiusMeters: Double
+    ): Long {
+        // TODO: 반경 내 장소 개수 쿼리 구현 필요
+        return 0L
+    }
+
+    data class LocationStatsInfo(
+        val locationId: UUID,
+        val viewCount: Long,
+        val visitCount: Long,
+        val uniqueVisitorCount: Long,
+        val reviewCount: Long,
+        val averageRating: Rating?,
+        val favoriteCount: Long
+    )
+}

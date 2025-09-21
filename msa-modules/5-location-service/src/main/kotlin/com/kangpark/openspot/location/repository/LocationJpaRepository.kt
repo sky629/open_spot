@@ -1,6 +1,6 @@
 package com.kangpark.openspot.location.repository
 
-import com.kangpark.openspot.location.domain.CategoryType
+import com.kangpark.openspot.location.domain.valueobject.CategoryType
 import com.kangpark.openspot.location.repository.entity.LocationJpaEntity
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable

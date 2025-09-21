@@ -1,8 +1,8 @@
 package com.kangpark.openspot.location.repository.entity
 
-import com.kangpark.openspot.location.domain.Rating
-import com.kangpark.openspot.location.domain.Review
-import com.kangpark.openspot.location.domain.ReviewStatus
+import com.kangpark.openspot.location.domain.valueobject.Rating
+import com.kangpark.openspot.location.domain.entity.Review
+import com.kangpark.openspot.location.domain.entity.ReviewStatus
 import jakarta.persistence.*
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.annotations.UuidGenerator
