@@ -1,9 +1,8 @@
 package com.kangpark.openspot.location.service.usecase
 
-import com.kangpark.openspot.location.domain.valueobject.CategoryType
-import com.kangpark.openspot.location.domain.valueobject.Rating
+import com.kangpark.openspot.location.domain.vo.CategoryType
+import com.kangpark.openspot.location.domain.vo.Rating
 import com.kangpark.openspot.location.domain.repository.LocationRepository
-import com.kangpark.openspot.location.service.usecase.GetLocationUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl

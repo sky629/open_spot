@@ -1,4 +1,4 @@
-package com.kangpark.openspot.location.domain.valueobject
+package com.kangpark.openspot.location.domain.vo
 
 enum class CategoryType(
     val displayName: String,

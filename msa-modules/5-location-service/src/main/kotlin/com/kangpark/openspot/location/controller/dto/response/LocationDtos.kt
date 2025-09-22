@@ -1,7 +1,7 @@
 package com.kangpark.openspot.location.controller.dto.response
 
 import com.kangpark.openspot.location.domain.entity.*
-import com.kangpark.openspot.location.domain.valueobject.*
+import com.kangpark.openspot.location.domain.vo.*
 import jakarta.validation.constraints.*
 import java.math.BigDecimal
 import java.time.LocalDateTime

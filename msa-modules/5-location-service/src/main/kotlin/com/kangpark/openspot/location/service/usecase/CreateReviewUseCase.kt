@@ -1,7 +1,7 @@
 package com.kangpark.openspot.location.service.usecase
 
 import com.kangpark.openspot.location.domain.repository.LocationRepository
-import com.kangpark.openspot.location.domain.valueobject.Rating
+import com.kangpark.openspot.location.domain.vo.Rating
 import com.kangpark.openspot.location.domain.entity.Review
 import com.kangpark.openspot.location.domain.entity.ReviewStatus
 import com.kangpark.openspot.location.domain.repository.ReviewRepository
@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.util.*
 
 /**

@@ -1,7 +1,7 @@
 package com.kangpark.openspot.location.domain.entity
 
 import com.kangpark.openspot.common.core.domain.BaseEntity
-import com.kangpark.openspot.location.domain.valueobject.Rating
+import com.kangpark.openspot.location.domain.vo.Rating
 import java.time.LocalDate
 import java.util.*
 

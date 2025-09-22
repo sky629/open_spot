@@ -1,7 +1,7 @@
 package com.kangpark.openspot.location.controller.dto.response
 
 import com.kangpark.openspot.location.domain.entity.LocationVisit
-import com.kangpark.openspot.location.domain.valueobject.VisitPurpose
+import com.kangpark.openspot.location.domain.vo.VisitPurpose
 import jakarta.validation.constraints.*
 import java.time.LocalDateTime
 import java.util.*

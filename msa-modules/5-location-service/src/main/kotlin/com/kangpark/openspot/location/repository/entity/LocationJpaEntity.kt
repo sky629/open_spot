@@ -1,8 +1,7 @@
 package com.kangpark.openspot.location.repository.entity
 
-import com.kangpark.openspot.common.core.domain.BaseEntity
-import com.kangpark.openspot.location.domain.valueobject.CategoryType
-import com.kangpark.openspot.location.domain.valueobject.Coordinates
+import com.kangpark.openspot.location.domain.vo.CategoryType
+import com.kangpark.openspot.location.domain.vo.Coordinates
 import com.kangpark.openspot.location.domain.entity.Location
 import jakarta.persistence.*
 import org.hibernate.annotations.JdbcTypeCode

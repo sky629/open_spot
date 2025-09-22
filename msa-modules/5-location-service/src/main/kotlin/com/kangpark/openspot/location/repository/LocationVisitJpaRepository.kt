@@ -1,6 +1,6 @@
 package com.kangpark.openspot.location.repository
 
-import com.kangpark.openspot.location.domain.valueobject.VisitPurpose
+import com.kangpark.openspot.location.domain.vo.VisitPurpose
 import com.kangpark.openspot.location.repository.entity.LocationVisitJpaEntity
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable

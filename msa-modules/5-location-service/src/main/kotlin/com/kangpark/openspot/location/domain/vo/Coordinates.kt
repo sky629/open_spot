@@ -1,4 +1,4 @@
-package com.kangpark.openspot.location.domain.valueobject
+package com.kangpark.openspot.location.domain.vo
 
 import jakarta.persistence.Embeddable
 import jakarta.validation.constraints.DecimalMax

@@ -1,6 +1,6 @@
 package com.kangpark.openspot.location.repository
 
-import com.kangpark.openspot.location.domain.valueobject.CategoryType
+import com.kangpark.openspot.location.domain.vo.CategoryType
 import com.kangpark.openspot.location.domain.entity.Location
 import com.kangpark.openspot.location.domain.repository.LocationRepository
 import com.kangpark.openspot.location.repository.entity.LocationJpaEntity

@@ -1,6 +1,6 @@
 package com.kangpark.openspot.location.repository.entity
 
-import com.kangpark.openspot.location.domain.valueobject.Rating
+import com.kangpark.openspot.location.domain.vo.Rating
 import com.kangpark.openspot.location.domain.entity.Review
 import com.kangpark.openspot.location.domain.entity.ReviewStatus
 import jakarta.persistence.*

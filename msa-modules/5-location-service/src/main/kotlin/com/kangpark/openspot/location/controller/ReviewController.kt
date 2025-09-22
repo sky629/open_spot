@@ -4,7 +4,7 @@ import com.kangpark.openspot.common.web.dto.ApiResponse
 import com.kangpark.openspot.common.web.dto.PageInfo
 import com.kangpark.openspot.common.web.dto.PageResponse
 import com.kangpark.openspot.location.controller.dto.response.*
-import com.kangpark.openspot.location.domain.valueobject.Rating
+import com.kangpark.openspot.location.domain.vo.Rating
 import com.kangpark.openspot.location.service.LocationApplicationService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter

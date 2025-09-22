@@ -1,7 +1,7 @@
 package com.kangpark.openspot.location.controller
 
 import com.kangpark.openspot.common.web.dto.ApiResponse
-import com.kangpark.openspot.location.domain.valueobject.CategoryType
+import com.kangpark.openspot.location.domain.vo.CategoryType
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity

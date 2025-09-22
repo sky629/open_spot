@@ -2,7 +2,6 @@ package com.kangpark.openspot.location.domain.repository
 
 import com.kangpark.openspot.location.domain.entity.Review
 import com.kangpark.openspot.location.domain.entity.ReviewStatus
-import com.kangpark.openspot.location.domain.valueobject.Rating
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import java.util.*

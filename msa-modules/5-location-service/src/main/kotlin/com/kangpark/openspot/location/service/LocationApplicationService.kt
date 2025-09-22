@@ -1,8 +1,7 @@
 package com.kangpark.openspot.location.service
 
 import com.kangpark.openspot.location.domain.entity.*
-import com.kangpark.openspot.location.domain.valueobject.*
-import com.kangpark.openspot.location.domain.repository.*
+import com.kangpark.openspot.location.domain.vo.*
 import com.kangpark.openspot.location.service.usecase.*
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable

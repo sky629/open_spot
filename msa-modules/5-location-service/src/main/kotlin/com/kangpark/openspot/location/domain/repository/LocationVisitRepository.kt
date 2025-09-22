@@ -1,7 +1,6 @@
 package com.kangpark.openspot.location.domain.repository
 
 import com.kangpark.openspot.location.domain.entity.LocationVisit
-import com.kangpark.openspot.location.domain.valueobject.VisitPurpose
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import java.time.LocalDateTime

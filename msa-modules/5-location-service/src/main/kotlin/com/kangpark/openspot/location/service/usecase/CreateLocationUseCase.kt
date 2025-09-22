@@ -1,7 +1,7 @@
 package com.kangpark.openspot.location.service.usecase
 
 import com.kangpark.openspot.location.domain.entity.*
-import com.kangpark.openspot.location.domain.valueobject.*
+import com.kangpark.openspot.location.domain.vo.*
 import com.kangpark.openspot.location.domain.repository.*
 import com.kangpark.openspot.location.service.event.LocationEventPublisher
 import org.slf4j.LoggerFactory

@@ -1,7 +1,7 @@
 package com.kangpark.openspot.location.service.usecase
 
-import com.kangpark.openspot.location.domain.valueobject.CategoryType
-import com.kangpark.openspot.location.domain.valueobject.Coordinates
+import com.kangpark.openspot.location.domain.vo.CategoryType
+import com.kangpark.openspot.location.domain.vo.Coordinates
 import com.kangpark.openspot.location.domain.entity.Location
 import com.kangpark.openspot.location.domain.repository.LocationRepository
 import com.kangpark.openspot.location.service.event.LocationEventPublisher

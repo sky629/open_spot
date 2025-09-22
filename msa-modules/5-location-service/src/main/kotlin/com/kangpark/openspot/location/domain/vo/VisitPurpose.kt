@@ -1,4 +1,4 @@
-package com.kangpark.openspot.location.domain.valueobject
+package com.kangpark.openspot.location.domain.vo
 
 /**
  * 방문 목적 값 객체

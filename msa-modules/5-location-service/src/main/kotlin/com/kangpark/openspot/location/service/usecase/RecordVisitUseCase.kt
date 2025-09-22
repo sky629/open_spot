@@ -2,7 +2,7 @@ package com.kangpark.openspot.location.service.usecase
 
 import com.kangpark.openspot.location.domain.repository.LocationRepository
 import com.kangpark.openspot.location.domain.entity.LocationVisit
-import com.kangpark.openspot.location.domain.valueobject.VisitPurpose
+import com.kangpark.openspot.location.domain.vo.VisitPurpose
 import com.kangpark.openspot.location.domain.repository.LocationVisitRepository
 import com.kangpark.openspot.location.service.event.LocationEventPublisher
 import org.slf4j.LoggerFactory
