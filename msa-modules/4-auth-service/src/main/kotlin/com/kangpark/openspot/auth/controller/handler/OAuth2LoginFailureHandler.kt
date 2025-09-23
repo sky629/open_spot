@@ -1,14 +1,17 @@
 package com.kangpark.openspot.auth.controller.handler
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.kangpark.openspot.auth.service.usecase.LoginUseCase
 import com.kangpark.openspot.common.web.dto.ApiResponse
 import com.kangpark.openspot.common.web.dto.ErrorResponse
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.AuthenticationException
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler
 import org.springframework.stereotype.Component
+import org.springframework.web.util.UriComponentsBuilder
 
 /**
  * OAuth2 로그인 실패 핸들러
@@ -16,10 +19,22 @@ import org.springframework.stereotype.Component
  */
 @Component
 class OAuth2LoginFailureHandler(
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    @param:Value("\${app.frontend.base-url}")
+    private val frontendBaseUrl: String,
+    @param:Value("\${app.frontend.auth-error-path}")
+private val authErrorPath: String
 ) : SimpleUrlAuthenticationFailureHandler() {
-    
     private val logger = LoggerFactory.getLogger(OAuth2LoginFailureHandler::class.java)
+
+    fun createErrorRedirectUrl(errorResponse: ErrorResponse): String {
+        return UriComponentsBuilder.fromUriString(frontendBaseUrl+authErrorPath)
+            .queryParam("code", errorResponse.code)
+            .queryParam("msg", errorResponse.message)
+            .queryParam("details", errorResponse.details)
+            .build()
+            .toUriString()
+    }
     
     override fun onAuthenticationFailure(
         request: HttpServletRequest,
@@ -36,21 +51,18 @@ class OAuth2LoginFailureHandler(
                 else -> "OAUTH2_LOGIN_FAILED"
             }
             
-            val errorResponse = ApiResponse.error<Any>(
-                ErrorResponse(
-                    code = errorCode,
-                    message = getErrorMessage(exception),
-                    details = mapOf(
-                        "error" to (exception.message ?: "Unknown error"),
-                        "type" to exception::class.java.simpleName
-                    )
+            val errorResponse = ErrorResponse(
+                code = errorCode,
+                message = getErrorMessage(exception),
+                details = mapOf(
+                    "error" to (exception.message ?: "Unknown error"),
+                    "type" to exception::class.java.simpleName
                 )
             )
-            
-            response.contentType = "application/json;charset=UTF-8"
+
             response.status = HttpServletResponse.SC_UNAUTHORIZED
-            response.writer.write(objectMapper.writeValueAsString(errorResponse))
-            
+            response.sendRedirect(createErrorRedirectUrl(errorResponse))
+
         } catch (e: Exception) {
             logger.error("Error handling OAuth2 login failure", e)
             response.status = HttpServletResponse.SC_INTERNAL_SERVER_ERROR
