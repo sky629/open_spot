@@ -1,7 +1,6 @@
 package com.kangpark.openspot.location.domain.repository
 
 import com.kangpark.openspot.location.domain.entity.Location
-import com.kangpark.openspot.location.domain.vo.CategoryType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import java.util.*
@@ -28,50 +27,69 @@ interface LocationRepository {
     fun deleteById(id: UUID)
 
     /**
-     * 특정 반경 내의 장소 검색
+     * 특정 반경 내의 장소 검색 (사용자별, 카테고리 필터 선택)
      */
     fun findByCoordinatesWithinRadius(
+        userId: UUID,
         latitude: Double,
         longitude: Double,
         radiusMeters: Double,
-        category: CategoryType? = null,
+        categoryId: UUID? = null,
         pageable: Pageable
     ): Page<Location>
 
     /**
-     * 카테고리별 장소 검색
+     * 지도 영역(bounds) 내의 장소 검색 (사용자별, 카테고리 필터 선택)
      */
-    fun findByCategory(category: CategoryType, pageable: Pageable): Page<Location>
+    fun findByCoordinatesWithinBounds(
+        userId: UUID,
+        northEastLat: Double,
+        northEastLon: Double,
+        southWestLat: Double,
+        southWestLon: Double,
+        categoryId: UUID? = null,
+        pageable: Pageable
+    ): Page<Location>
 
     /**
-     * 키워드로 장소 검색
+     * 카테고리별 장소 검색 (사용자별)
      */
-    fun findByKeyword(keyword: String, pageable: Pageable): Page<Location>
+    fun findByUserIdAndCategoryId(userId: UUID, categoryId: UUID, pageable: Pageable): Page<Location>
 
     /**
-     * 인기 장소 목록 (조회수 기준)
+     * 키워드로 장소 검색 (사용자별)
      */
-    fun findPopularLocations(pageable: Pageable): Page<Location>
+    fun findByUserIdAndKeyword(userId: UUID, keyword: String, pageable: Pageable): Page<Location>
 
     /**
-     * 최고 평점 장소 목록
+     * 최고 평점 장소 목록 (사용자별)
      */
-    fun findTopRatedLocations(pageable: Pageable): Page<Location>
+    fun findTopRatedLocationsByUser(userId: UUID, pageable: Pageable): Page<Location>
 
     /**
-     * 최근 등록 장소 목록
+     * 최근 등록 장소 목록 (사용자별)
      */
-    fun findRecentLocations(pageable: Pageable): Page<Location>
+    fun findRecentLocationsByUser(userId: UUID, pageable: Pageable): Page<Location>
 
     /**
      * 사용자가 생성한 장소 목록
      */
-    fun findByCreatedBy(createdBy: UUID, pageable: Pageable): Page<Location>
+    fun findByUserId(userId: UUID, pageable: Pageable): Page<Location>
 
     /**
-     * 카테고리별 장소 개수
+     * 특정 그룹에 속한 장소 목록
      */
-    fun countByCategory(): Map<CategoryType, Long>
+    fun findByGroupId(groupId: UUID): List<Location>
+
+    /**
+     * 사용자의 특정 그룹에 속한 장소 목록
+     */
+    fun findByUserIdAndGroupId(userId: UUID, groupId: UUID?, pageable: Pageable): Page<Location>
+
+    /**
+     * 사용자의 카테고리별 장소 개수
+     */
+    fun countByUserIdAndCategoryId(userId: UUID): Map<UUID, Long>
 
     /**
      * 장소 존재 확인

@@ -1,6 +1,6 @@
 package com.kangpark.openspot.auth.service
 
-import com.kangpark.openspot.auth.domain.User
+import com.kangpark.openspot.auth.domain.entity.User
 import com.kangpark.openspot.auth.service.usecase.*
 import org.springframework.security.oauth2.core.user.OAuth2User
 import org.springframework.stereotype.Service

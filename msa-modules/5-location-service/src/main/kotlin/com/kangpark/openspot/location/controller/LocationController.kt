@@ -6,6 +6,7 @@ import com.kangpark.openspot.common.web.dto.PageResponse
 import com.kangpark.openspot.location.controller.dto.response.*
 import com.kangpark.openspot.location.domain.vo.Coordinates
 import com.kangpark.openspot.location.service.LocationApplicationService
+import com.kangpark.openspot.location.service.usecase.command.*
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -18,7 +19,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.util.*
 
-@Tag(name = "Location", description = "장소 관리 API")
+@Tag(name = "Location", description = "개인 장소 기록 API")
 @RestController
 @RequestMapping("/api/v1/locations")
 class LocationController(
@@ -26,7 +27,7 @@ class LocationController(
 ) {
     private val logger = LoggerFactory.getLogger(LocationController::class.java)
 
-    @Operation(summary = "새 장소 생성", description = "사용자가 새로운 장소를 등록합니다.")
+    @Operation(summary = "새 장소 생성", description = "사용자가 새로운 개인 장소를 등록합니다.")
     @PostMapping
     fun createLocation(
         @Valid @RequestBody request: CreateLocationRequest,
@@ -34,19 +35,22 @@ class LocationController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<LocationResponse>> {
         return try {
-            val location = locationApplicationService.createLocation(
+            val command = CreateLocationCommand(
                 name = request.name,
                 description = request.description,
                 address = request.address,
-                category = request.category,
+                categoryId = request.categoryId,
                 coordinates = request.toCoordinates(),
-                createdBy = userId,
-                phoneNumber = request.phoneNumber,
-                websiteUrl = request.websiteUrl,
-                businessHours = request.businessHours
+                iconUrl = request.iconUrl,
+                personalRating = request.personalRating,
+                personalReview = request.personalReview,
+                tags = request.tags,
+                groupId = request.groupId
             )
 
-            val response = LocationResponse.from(location)
+            val (location, category) = locationApplicationService.createLocation(userId, command)
+
+            val response = LocationResponse.from(location, category)
             ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response))
 
         } catch (e: IllegalArgumentException) {
@@ -72,22 +76,23 @@ class LocationController(
         }
     }
 
-    @Operation(summary = "장소 상세 조회", description = "특정 장소의 상세 정보를 조회합니다. 조회수가 증가합니다.")
+    @Operation(summary = "장소 상세 조회", description = "특정 장소의 상세 정보를 조회합니다. 본인의 장소만 조회 가능합니다.")
     @GetMapping("/{locationId}")
     fun getLocation(
         @Parameter(description = "장소 ID", required = true)
         @PathVariable locationId: UUID,
-        @Parameter(description = "사용자 ID (선택사항)")
-        @RequestHeader(value = "X-User-Id", required = false) userId: UUID?
+        @Parameter(description = "사용자 ID", required = true)
+        @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<LocationResponse>> {
-        val location = locationApplicationService.getLocationById(locationId, userId)
+        val result = locationApplicationService.getLocationById(locationId, userId)
             ?: return ResponseEntity.notFound().build()
 
-        val response = LocationResponse.from(location)
+        val (location, category) = result
+        val response = LocationResponse.from(location, category)
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
-    @Operation(summary = "장소 정보 수정", description = "장소 생성자가 장소 정보를 수정합니다.")
+    @Operation(summary = "장소 기본 정보 수정", description = "장소의 기본 정보를 수정합니다.")
     @PutMapping("/{locationId}")
     fun updateLocation(
         @Parameter(description = "장소 ID", required = true)
@@ -97,19 +102,17 @@ class LocationController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<LocationResponse>> {
         return try {
-            val location = locationApplicationService.updateLocation(
-                locationId = locationId,
-                userId = userId,
+            val command = UpdateLocationCommand(
                 name = request.name,
                 description = request.description,
                 address = request.address,
-                category = request.category,
-                phoneNumber = request.phoneNumber,
-                websiteUrl = request.websiteUrl,
-                businessHours = request.businessHours
+                categoryId = request.categoryId,
+                iconUrl = request.iconUrl
             )
 
-            val response = LocationResponse.from(location)
+            val (location, category) = locationApplicationService.updateLocation(locationId, userId, command)
+
+            val response = LocationResponse.from(location, category)
             ResponseEntity.ok(ApiResponse.success(response))
 
         } catch (e: IllegalArgumentException) {
@@ -135,7 +138,93 @@ class LocationController(
         }
     }
 
-    @Operation(summary = "장소 좌표 수정", description = "장소 생성자가 장소의 좌표를 수정합니다.")
+    @Operation(summary = "개인 평가 정보 수정", description = "장소에 대한 개인 평점, 리뷰, 태그 등을 수정합니다.")
+    @PutMapping("/{locationId}/evaluation")
+    fun updateLocationEvaluation(
+        @Parameter(description = "장소 ID", required = true)
+        @PathVariable locationId: UUID,
+        @Valid @RequestBody request: UpdateLocationEvaluationRequest,
+        @Parameter(description = "사용자 ID", required = true)
+        @RequestHeader("X-User-Id") userId: UUID
+    ): ResponseEntity<ApiResponse<LocationResponse>> {
+        return try {
+            val command = UpdateLocationEvaluationCommand(
+                personalRating = request.personalRating,
+                personalReview = request.personalReview,
+                tags = request.tags
+            )
+
+            val (location, category) = locationApplicationService.updateLocationEvaluation(locationId, userId, command)
+
+            val response = LocationResponse.from(location, category)
+            ResponseEntity.ok(ApiResponse.success(response))
+
+        } catch (e: IllegalArgumentException) {
+            logger.warn("Invalid evaluation update request: {}", e.message)
+            ResponseEntity.badRequest().body(
+                ApiResponse.error<LocationResponse>(
+                    com.kangpark.openspot.common.web.dto.ErrorResponse(
+                        code = "INVALID_REQUEST",
+                        message = e.message ?: "잘못된 요청입니다"
+                    )
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("Failed to update evaluation: {}", locationId, e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                ApiResponse.error<LocationResponse>(
+                    com.kangpark.openspot.common.web.dto.ErrorResponse(
+                        code = "INTERNAL_SERVER_ERROR",
+                        message = "서버 오류가 발생했습니다"
+                    )
+                )
+            )
+        }
+    }
+
+    @Operation(summary = "장소 그룹 변경", description = "장소가 속한 그룹을 변경합니다.")
+    @PutMapping("/{locationId}/group")
+    fun changeLocationGroup(
+        @Parameter(description = "장소 ID", required = true)
+        @PathVariable locationId: UUID,
+        @Valid @RequestBody request: ChangeLocationGroupRequest,
+        @Parameter(description = "사용자 ID", required = true)
+        @RequestHeader("X-User-Id") userId: UUID
+    ): ResponseEntity<ApiResponse<LocationResponse>> {
+        return try {
+            val (location, category) = locationApplicationService.changeLocationGroup(
+                locationId = locationId,
+                userId = userId,
+                groupId = request.groupId
+            )
+
+            val response = LocationResponse.from(location, category)
+            ResponseEntity.ok(ApiResponse.success(response))
+
+        } catch (e: IllegalArgumentException) {
+            logger.warn("Invalid group change request: {}", e.message)
+            ResponseEntity.badRequest().body(
+                ApiResponse.error<LocationResponse>(
+                    com.kangpark.openspot.common.web.dto.ErrorResponse(
+                        code = "INVALID_REQUEST",
+                        message = e.message ?: "잘못된 요청입니다"
+                    )
+                )
+            )
+        } catch (e: Exception) {
+            logger.error("Failed to change group: {}", locationId, e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                ApiResponse.error<LocationResponse>(
+                    com.kangpark.openspot.common.web.dto.ErrorResponse(
+                        code = "INTERNAL_SERVER_ERROR",
+                        message = "서버 오류가 발생했습니다"
+                    )
+                )
+            )
+        }
+    }
+
+    @Operation(summary = "장소 좌표 수정", description = "장소의 좌표를 수정합니다.")
     @PutMapping("/{locationId}/coordinates")
     fun updateLocationCoordinates(
         @Parameter(description = "장소 ID", required = true)
@@ -145,13 +234,13 @@ class LocationController(
         @RequestHeader("X-User-Id") userId: UUID
     ): ResponseEntity<ApiResponse<LocationResponse>> {
         return try {
-            val location = locationApplicationService.updateLocationCoordinates(
+            val (location, category) = locationApplicationService.updateLocationCoordinates(
                 locationId = locationId,
                 userId = userId,
                 coordinates = request.toCoordinates()
             )
 
-            val response = LocationResponse.from(location)
+            val response = LocationResponse.from(location, category)
             ResponseEntity.ok(ApiResponse.success(response))
 
         } catch (e: IllegalArgumentException) {
@@ -177,7 +266,7 @@ class LocationController(
         }
     }
 
-    @Operation(summary = "장소 비활성화", description = "장소 생성자가 장소를 비활성화합니다 (논리적 삭제).")
+    @Operation(summary = "장소 비활성화", description = "장소를 비활성화합니다 (논리적 삭제).")
     @DeleteMapping("/{locationId}")
     fun deactivateLocation(
         @Parameter(description = "장소 ID", required = true)
@@ -217,39 +306,67 @@ class LocationController(
         }
     }
 
-    @Operation(summary = "장소 검색", description = "다양한 조건으로 장소를 검색합니다.")
-    @GetMapping("/search")
-    fun searchLocations(
+    @Operation(
+        summary = "장소 목록 조회",
+        description = """
+            다양한 조건으로 장소를 조회합니다.
+            - bounds 파라미터: 지도 영역 내 검색 (우선순위 1)
+            - radius 파라미터: 반경 검색 (우선순위 2)
+            - categoryId: 카테고리 필터
+            - keyword: 키워드 검색
+            - targetUserId: 조회할 사용자 (미지정 시 본인, 향후 친구 기능용)
+        """
+    )
+    @GetMapping
+    fun getLocations(
         @Parameter(description = "검색 조건")
         @ModelAttribute request: LocationSearchRequest,
+        @Parameter(description = "사용자 ID", required = true)
+        @RequestHeader("X-User-Id") userId: UUID,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
+        // 조회 대상 사용자 (향후 친구 기능 확장용)
+        val targetUserId = request.targetUserId ?: userId
+
         val locationPage = when {
-            // 반경 검색
-            request.latitude != null && request.longitude != null && request.radiusMeters != null -> {
-                locationApplicationService.searchLocationsByRadius(
-                    latitude = request.latitude,
-                    longitude = request.longitude,
-                    radiusMeters = request.radiusMeters,
-                    category = request.category,
+            // 1. 지도 영역(bounds) 검색 (우선순위 최상)
+            request.hasBounds() -> {
+                locationApplicationService.searchLocationsByBounds(
+                    userId = targetUserId,
+                    northEastLat = request.northEastLat!!,
+                    northEastLon = request.northEastLon!!,
+                    southWestLat = request.southWestLat!!,
+                    southWestLon = request.southWestLon!!,
+                    categoryId = request.categoryId,
                     pageable = pageable
                 )
             }
-            // 카테고리 검색
-            request.category != null -> {
-                locationApplicationService.getLocationsByCategory(request.category, pageable)
+            // 2. 반경 검색
+            request.hasRadius() -> {
+                locationApplicationService.searchLocationsByRadius(
+                    userId = targetUserId,
+                    latitude = request.latitude!!,
+                    longitude = request.longitude!!,
+                    radiusMeters = request.radiusMeters!!,
+                    categoryId = request.categoryId,
+                    pageable = pageable
+                )
             }
-            // 키워드 검색
+            // 3. 카테고리 검색
+            request.categoryId != null -> {
+                locationApplicationService.getLocationsByCategory(targetUserId, request.categoryId, pageable)
+            }
+            // 4. 키워드 검색
             !request.keyword.isNullOrBlank() -> {
-                locationApplicationService.searchLocationsByKeyword(request.keyword, pageable)
+                locationApplicationService.searchLocationsByKeyword(targetUserId, request.keyword, pageable)
             }
-            // 기본: 최근 등록순
+            // 5. 기본: 최근 등록순
             else -> {
-                locationApplicationService.getRecentLocations(pageable)
+                locationApplicationService.getRecentLocations(targetUserId, pageable)
             }
         }
 
-        val responseList = locationPage.content.map { location ->
+        val responseList = locationPage.content.map { (location, category) ->
             val distance = if (request.latitude != null && request.longitude != null) {
                 location.distanceTo(
                     Coordinates.of(
@@ -258,7 +375,7 @@ class LocationController(
                 )
             } else null
 
-            LocationSummaryResponse.from(location, distance)
+            LocationSummaryResponse.from(location, category, distance)
         }
 
         val pageResponse = PageResponse(
@@ -275,34 +392,17 @@ class LocationController(
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
-    @Operation(summary = "인기 장소 목록", description = "조회수 기준 인기 장소 목록을 조회합니다.")
-    @GetMapping("/popular")
-    fun getPopularLocations(
-        @PageableDefault(size = 20) pageable: Pageable
-    ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val locationPage = locationApplicationService.getPopularLocations(pageable)
-        val responseList = locationPage.content.map { LocationSummaryResponse.from(it) }
-        val pageResponse = PageResponse(
-            content = responseList,
-            page = PageInfo(
-                number = locationPage.number,
-                size = locationPage.size,
-                totalElements = locationPage.totalElements,
-                totalPages = locationPage.totalPages,
-                first = locationPage.isFirst,
-                last = locationPage.isLast
-            )
-        )
-        return ResponseEntity.ok(ApiResponse.success(pageResponse))
-    }
-
-    @Operation(summary = "최고 평점 장소 목록", description = "평점 기준 최고 평점 장소 목록을 조회합니다.")
+    @Operation(summary = "최고 평점 장소 목록", description = "내 개인 평점 기준 최고 평점 장소 목록을 조회합니다.")
     @GetMapping("/top-rated")
     fun getTopRatedLocations(
+        @Parameter(description = "사용자 ID", required = true)
+        @RequestHeader("X-User-Id") userId: UUID,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val locationPage = locationApplicationService.getTopRatedLocations(pageable)
-        val responseList = locationPage.content.map { LocationSummaryResponse.from(it) }
+        val locationPage = locationApplicationService.getTopRatedLocations(userId, pageable)
+        val responseList = locationPage.content.map { (location, category) ->
+            LocationSummaryResponse.from(location, category)
+        }
         val pageResponse = PageResponse(
             content = responseList,
             page = PageInfo(
@@ -317,13 +417,17 @@ class LocationController(
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
-    @Operation(summary = "최근 등록 장소 목록", description = "최근 등록된 장소 목록을 조회합니다.")
+    @Operation(summary = "최근 등록 장소 목록", description = "최근 등록한 내 장소 목록을 조회합니다.")
     @GetMapping("/recent")
     fun getRecentLocations(
+        @Parameter(description = "사용자 ID", required = true)
+        @RequestHeader("X-User-Id") userId: UUID,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val locationPage = locationApplicationService.getRecentLocations(pageable)
-        val responseList = locationPage.content.map { LocationSummaryResponse.from(it) }
+        val locationPage = locationApplicationService.getRecentLocations(userId, pageable)
+        val responseList = locationPage.content.map { (location, category) ->
+            LocationSummaryResponse.from(location, category)
+        }
         val pageResponse = PageResponse(
             content = responseList,
             page = PageInfo(
@@ -338,15 +442,17 @@ class LocationController(
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
-    @Operation(summary = "사용자 생성 장소 목록", description = "특정 사용자가 생성한 장소 목록을 조회합니다.")
-    @GetMapping("/my")
+    @Operation(summary = "내 장소 목록", description = "내가 생성한 모든 장소 목록을 조회합니다.")
+    @GetMapping("/self")
     fun getMyLocations(
         @Parameter(description = "사용자 ID", required = true)
         @RequestHeader("X-User-Id") userId: UUID,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
         val locationPage = locationApplicationService.getLocationsByUser(userId, pageable)
-        val responseList = locationPage.content.map { LocationSummaryResponse.from(it) }
+        val responseList = locationPage.content.map { (location, category) ->
+            LocationSummaryResponse.from(location, category)
+        }
         val pageResponse = PageResponse(
             content = responseList,
             page = PageInfo(
@@ -361,48 +467,30 @@ class LocationController(
         return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 
-    @Operation(summary = "카테고리별 장소 개수", description = "각 카테고리별 활성 장소 개수를 조회합니다.")
-    @GetMapping("/categories/stats")
-    fun getCategoryStats(): ResponseEntity<ApiResponse<List<CategoryStatsResponse>>> {
-        val categoryStats = locationApplicationService.getLocationCountByCategory()
-        val responseList = categoryStats.map { (category, count) ->
-            CategoryStatsResponse.from(category, count)
+    @Operation(summary = "그룹별 장소 목록", description = "특정 그룹에 속한 내 장소 목록을 조회합니다.")
+    @GetMapping("/groups/{groupId}")
+    fun getLocationsByGroup(
+        @Parameter(description = "그룹 ID (null이면 그룹 미지정 장소)")
+        @PathVariable(required = false) groupId: UUID?,
+        @Parameter(description = "사용자 ID", required = true)
+        @RequestHeader("X-User-Id") userId: UUID,
+        @PageableDefault(size = 20) pageable: Pageable
+    ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
+        val locationPage = locationApplicationService.getLocationsByUserAndGroup(userId, groupId, pageable)
+        val responseList = locationPage.content.map { (location, category) ->
+            LocationSummaryResponse.from(location, category)
         }
-        return ResponseEntity.ok(ApiResponse.success(responseList))
-    }
-
-    @Operation(summary = "장소 통계", description = "특정 장소의 통계 정보를 조회합니다.")
-    @GetMapping("/{locationId}/stats")
-    fun getLocationStats(
-        @Parameter(description = "장소 ID", required = true)
-        @PathVariable locationId: UUID
-    ): ResponseEntity<ApiResponse<LocationStatsResponse>> {
-        return try {
-            val stats = locationApplicationService.getLocationStats(locationId)
-            val response = LocationStatsResponse(
-                locationId = stats.locationId,
-                viewCount = stats.viewCount,
-                visitCount = stats.visitCount,
-                uniqueVisitorCount = stats.uniqueVisitorCount,
-                reviewCount = stats.reviewCount,
-                averageRating = stats.averageRating?.score,
-                favoriteCount = stats.favoriteCount
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = locationPage.number,
+                size = locationPage.size,
+                totalElements = locationPage.totalElements,
+                totalPages = locationPage.totalPages,
+                first = locationPage.isFirst,
+                last = locationPage.isLast
             )
-            ResponseEntity.ok(ApiResponse.success(response))
-
-        } catch (e: IllegalArgumentException) {
-            logger.warn("Location not found for stats: {}", locationId)
-            ResponseEntity.notFound().build()
-        } catch (e: Exception) {
-            logger.error("Failed to get location stats: {}", locationId, e)
-            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                ApiResponse.error<LocationStatsResponse>(
-                    com.kangpark.openspot.common.web.dto.ErrorResponse(
-                        code = "INTERNAL_SERVER_ERROR",
-                        message = "서버 오류가 발생했습니다"
-                    )
-                )
-            )
-        }
+        )
+        return ResponseEntity.ok(ApiResponse.success(pageResponse))
     }
 }

@@ -4,18 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Open-Spot** is a microservices platform where users can record and share locations they have visited with ratings, reviews, and memories. Built with Spring Boot 3.5.5, Kotlin, and Clean Architecture principles.
+**Open-Spot** is a map-based location sharing platform where users can record ratings and information about places they've visited. Built with Spring Boot 3.5.5, Kotlin, and Clean Architecture principles.
 
-### Target: Users can pin locations on a map, record information and ratings for various categories (restaurants, cafes, shopping, parks, entertainment, accommodation), and share their experiences with others.
+### Purpose
+사용자가 방문한 장소에 대한 개인적인 평점과 정보를 기록하고 관리하는 지도 기반 위치 공유 서비스입니다. 장소들을 그룹으로 관리할 수 있으며, 추후 친구들과 방문 장소 그룹을 공유할 수 있는 소셜 기능이 추가될 예정입니다.
 
-### Key Features
-- **위치 기반 서비스**: PostGIS를 활용한 공간 쿼리 (반경 내 장소 검색)
+### Core Features
+- **개인 장소 기록**: 사용자가 원하는 위치에 평점과 정보를 기록하고 관리
+- **그룹 관리**: 방문한 장소들을 카테고리별로 그룹화하여 체계적으로 관리
+- **지도 기반 검색**: PostGIS 공간 쿼리로 내 주변 또는 특정 반경 내 기록된 장소 검색
+- **리뷰 및 메모**: 각 장소에 대한 상세한 리뷰, 사진, 방문 일자 등 기록
+- **방문 이력**: 언제, 어디를, 누구와 방문했는지 추적
+- **즐겨찾기**: 다시 방문하고 싶은 장소 북마크
+- **소셜 공유 (예정)**: 친구들과 장소 그룹 및 추천 공유
+
+### Technical Features
+- **위치 기반 서비스**: PostGIS를 활용한 공간 쿼리 (반경 내 장소 검색, 거리 계산)
 - **사용자 인증**: Google OAuth2 + JWT 기반 인증
-- **리뷰 시스템**: 장소별 평점 및 리뷰 작성/조회
-- **방문 기록**: 사용자의 장소 방문 이력 추적
-- **즐겨찾기**: 관심 장소 북마크 기능
 - **실시간 알림**: Kafka 기반 이벤트 처리
 - **API 문서화**: Swagger UI를 통한 한국어 API 문서 제공
+- **캐싱**: Redis를 활용한 성능 최적화
 
 ## Architecture Overview
 

@@ -1,7 +1,13 @@
 package com.kangpark.openspot.notification.domain
 
-import com.kangpark.openspot.common.core.domain.BaseEntity
+import com.kangpark.openspot.notification.domain.vo.DeviceType
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.annotations.UuidGenerator
+import org.hibernate.type.SqlTypes
+import org.springframework.data.annotation.CreatedDate
+import org.springframework.data.annotation.LastModifiedDate
+import org.springframework.data.jpa.domain.support.AuditingEntityListener
 import java.time.LocalDateTime
 import java.util.*
 
@@ -19,7 +25,14 @@ import java.util.*
         UniqueConstraint(name = "uk_device_tokens_token", columnNames = ["token"])
     ]
 )
+@EntityListeners(AuditingEntityListener::class)
 class DeviceToken(
+    @Id
+    @UuidGenerator(style = UuidGenerator.Style.TIME)
+    @JdbcTypeCode(SqlTypes.UUID)
+    @Column(name = "id", nullable = false, updatable = false, columnDefinition = "uuid")
+    val id: UUID? = null,
+
     @Column(name = "user_id", nullable = false)
     val userId: UUID,
 
@@ -37,8 +50,16 @@ class DeviceToken(
     var isActive: Boolean = true,
 
     @Column(name = "last_used_at")
-    var lastUsedAt: LocalDateTime? = null
-) : BaseEntity() {
+    var lastUsedAt: LocalDateTime? = null,
+
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    var createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @LastModifiedDate
+    @Column(name = "updated_at", nullable = false)
+    var updatedAt: LocalDateTime = LocalDateTime.now()
+) {
 
     fun markAsUsed() {
         lastUsedAt = LocalDateTime.now()
@@ -65,8 +86,4 @@ class DeviceToken(
     override fun toString(): String {
         return "DeviceToken(id=$id, userId=$userId, deviceType=$deviceType, isActive=$isActive)"
     }
-}
-
-enum class DeviceType {
-    WEB, ANDROID, IOS
 }

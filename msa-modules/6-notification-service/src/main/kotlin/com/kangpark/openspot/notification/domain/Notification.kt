@@ -1,5 +1,6 @@
 package com.kangpark.openspot.notification.domain
 
+import com.kangpark.openspot.notification.domain.vo.NotificationType
 import jakarta.persistence.*
 import java.time.LocalDateTime
 import java.util.*
@@ -79,8 +80,4 @@ class Notification(
     override fun toString(): String {
         return "Notification(id=$id, userId=$userId, type=$notificationType, title=$title)"
     }
-}
-
-enum class NotificationType {
-    REPORT_COMPLETE, SYSTEM_NOTICE
 }

@@ -1,7 +1,7 @@
 package com.kangpark.openspot.auth.controller.dto.response
 
 import com.fasterxml.jackson.annotation.JsonFormat
-import com.kangpark.openspot.auth.domain.User
+import com.kangpark.openspot.auth.domain.entity.User
 import java.time.LocalDateTime
 import java.util.UUID
 

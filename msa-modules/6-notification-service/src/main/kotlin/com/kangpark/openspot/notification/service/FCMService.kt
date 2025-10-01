@@ -2,7 +2,7 @@ package com.kangpark.openspot.notification.service
 
 import com.google.firebase.messaging.*
 import com.kangpark.openspot.notification.domain.DeviceToken
-import com.kangpark.openspot.notification.domain.DeviceType
+import com.kangpark.openspot.notification.domain.vo.DeviceType
 import com.kangpark.openspot.notification.domain.Notification
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service

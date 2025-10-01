@@ -2,27 +2,25 @@ package com.kangpark.openspot.location.service.usecase
 
 import com.kangpark.openspot.location.domain.entity.Location
 import com.kangpark.openspot.location.domain.repository.LocationRepository
-import com.kangpark.openspot.location.service.event.LocationEventPublisher
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.util.*
 
 /**
- * 장소 조회 Use Case
+ * 장소 조회 Use Case (개인 기록 서비스)
  */
 @Component
+@Transactional(readOnly = true)
 class GetLocationUseCase(
-    private val locationRepository: LocationRepository,
-    private val locationEventPublisher: LocationEventPublisher
+    private val locationRepository: LocationRepository
 ) {
     private val logger = LoggerFactory.getLogger(GetLocationUseCase::class.java)
 
     /**
-     * 장소 정보를 조회합니다 (조회수 증가)
+     * 장소 정보를 조회합니다
      */
-    @Transactional
-    fun execute(locationId: UUID, userId: UUID? = null): Location? {
+    fun execute(locationId: UUID, userId: UUID): Location? {
         val location = locationRepository.findById(locationId)
             ?: return null
 
@@ -30,23 +28,12 @@ class GetLocationUseCase(
             return null
         }
 
-        // 조회수 증가
-        location.incrementViewCount()
-        locationRepository.save(location)
-
-        // 조회 이벤트 발행
-        locationEventPublisher.publishLocationViewed(location, userId)
+        // 본인의 장소만 조회 가능
+        if (location.userId != userId) {
+            logger.warn("User {} attempted to access location {} owned by {}", userId, locationId, location.userId)
+            return null
+        }
 
         return location
-    }
-
-    /**
-     * 장소 정보를 조회합니다 (조회수 증가 없음)
-     */
-    fun executeWithoutIncrement(locationId: UUID): Location? {
-        val location = locationRepository.findById(locationId)
-            ?: return null
-
-        return if (location.isActive) location else null
     }
 }

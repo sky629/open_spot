@@ -1,33 +1,16 @@
 package com.kangpark.openspot.common.core.domain
 
-import jakarta.persistence.*
-import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.annotations.UuidGenerator
-import org.hibernate.type.SqlTypes
-import org.springframework.data.annotation.CreatedDate
-import org.springframework.data.annotation.LastModifiedDate
-import org.springframework.data.jpa.domain.support.AuditingEntityListener
+import com.github.f4b6a3.uuid.UuidCreator
 import java.time.LocalDateTime
 import java.util.UUID
 
-
-@MappedSuperclass
-@EntityListeners(AuditingEntityListener::class)
-abstract class BaseEntity {
-
-    @Id
-    @UuidGenerator(style = UuidGenerator.Style.TIME)
-    @JdbcTypeCode(SqlTypes.UUID)
-    @Column(name = "id", nullable = false, updatable = false, columnDefinition = "uuid")
-    val id: UUID = UUID.randomUUID()
-
-    @CreatedDate
-    @Column(nullable = false, updatable = false)
-    var createdAt: LocalDateTime = LocalDateTime.now()
-        protected set
-
-    @LastModifiedDate
-    @Column(nullable = false)
-    var updatedAt: LocalDateTime = LocalDateTime.now()
-        protected set
-}
+/**
+ * Base Entity for Domain Models
+ * Pure domain object without any infrastructure dependencies
+ * Uses UUIDv7 for time-ordered, sortable IDs
+ */
+data class BaseEntity(
+    val id: UUID = UuidCreator.getTimeOrderedEpoch(),  // UUIDv7: 시간 순서 보장
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    val updatedAt: LocalDateTime = LocalDateTime.now()
+)

@@ -1,7 +1,7 @@
 package com.kangpark.openspot.notification.repository
 
 import com.kangpark.openspot.notification.domain.DeviceToken
-import com.kangpark.openspot.notification.domain.DeviceType
+import com.kangpark.openspot.notification.domain.vo.DeviceType
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query

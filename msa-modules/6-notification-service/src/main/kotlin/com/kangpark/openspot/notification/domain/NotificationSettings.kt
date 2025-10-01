@@ -1,7 +1,14 @@
 package com.kangpark.openspot.notification.domain
 
-import com.kangpark.openspot.common.core.domain.BaseEntity
+import com.kangpark.openspot.notification.domain.vo.NotificationType
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.annotations.UuidGenerator
+import org.hibernate.type.SqlTypes
+import org.springframework.data.annotation.CreatedDate
+import org.springframework.data.annotation.LastModifiedDate
+import org.springframework.data.jpa.domain.support.AuditingEntityListener
+import java.time.LocalDateTime
 import java.util.*
 
 @Entity
@@ -15,7 +22,14 @@ import java.util.*
         UniqueConstraint(name = "uk_notification_settings_user_id", columnNames = ["user_id"])
     ]
 )
+@EntityListeners(AuditingEntityListener::class)
 class NotificationSettings(
+    @Id
+    @UuidGenerator(style = UuidGenerator.Style.TIME)
+    @JdbcTypeCode(SqlTypes.UUID)
+    @Column(name = "id", nullable = false, updatable = false, columnDefinition = "uuid")
+    val id: UUID? = null,
+
     @Column(name = "user_id", nullable = false, unique = true)
     val userId: UUID,
 
@@ -23,8 +37,16 @@ class NotificationSettings(
     var reportEnabled: Boolean = true,
 
     @Column(name = "system_enabled", nullable = false)
-    var systemEnabled: Boolean = true
-) : BaseEntity() {
+    var systemEnabled: Boolean = true,
+
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    var createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @LastModifiedDate
+    @Column(name = "updated_at", nullable = false)
+    var updatedAt: LocalDateTime = LocalDateTime.now()
+) {
 
     fun updateReportSetting(enabled: Boolean) {
         reportEnabled = enabled

@@ -1,8 +1,8 @@
 package com.kangpark.openspot.auth.service.usecase
 
-import com.kangpark.openspot.auth.domain.AuthDomainService
-import com.kangpark.openspot.auth.domain.SocialProvider
-import com.kangpark.openspot.auth.domain.User
+import com.kangpark.openspot.auth.domain.service.AuthDomainService
+import com.kangpark.openspot.auth.domain.vo.SocialProvider
+import com.kangpark.openspot.auth.domain.entity.User
 import com.kangpark.openspot.auth.repository.external.GoogleOAuthClient
 import com.kangpark.openspot.auth.repository.external.JwtTokenProvider
 import org.springframework.security.oauth2.core.user.OAuth2User

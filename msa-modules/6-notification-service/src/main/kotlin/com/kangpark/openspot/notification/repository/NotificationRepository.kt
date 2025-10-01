@@ -1,7 +1,7 @@
 package com.kangpark.openspot.notification.repository
 
 import com.kangpark.openspot.notification.domain.Notification
-import com.kangpark.openspot.notification.domain.NotificationType
+import com.kangpark.openspot.notification.domain.vo.NotificationType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository

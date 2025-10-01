@@ -1,7 +1,7 @@
 package com.kangpark.openspot.auth.service.usecase
 
-import com.kangpark.openspot.auth.domain.AuthDomainService
-import com.kangpark.openspot.auth.domain.UserRepository
+import com.kangpark.openspot.auth.domain.service.AuthDomainService
+import com.kangpark.openspot.auth.domain.repository.UserRepository
 import com.kangpark.openspot.auth.repository.external.JwtTokenProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

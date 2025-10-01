@@ -1,6 +1,10 @@
 package com.kangpark.openspot.notification.service
 
-import com.kangpark.openspot.notification.domain.*
+import com.kangpark.openspot.notification.domain.DeviceToken
+import com.kangpark.openspot.notification.domain.Notification
+import com.kangpark.openspot.notification.domain.NotificationSettings
+import com.kangpark.openspot.notification.domain.vo.DeviceType
+import com.kangpark.openspot.notification.domain.vo.NotificationType
 import com.kangpark.openspot.notification.event.ReportGeneratedEvent
 import com.kangpark.openspot.notification.event.SystemNoticeEvent
 import com.kangpark.openspot.notification.repository.DeviceTokenRepository
