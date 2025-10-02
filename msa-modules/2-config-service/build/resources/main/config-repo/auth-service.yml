@@ -56,13 +56,31 @@ spring:
             
 jwt:
   secret: ${JWT_SECRET:openspot-jwt-secret-key-for-development-only}
-  expiration: 86400000 # 24 hours
+  access-token-expiration: 3600000    # Access Token: 1시간 (밀리초)
+  refresh-token-expiration: 604800000 # Refresh Token: 7일 (밀리초)
 
 app:
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
     auth-success-path: ${FRONTEND_AUTH_SUCCESS_PATH:/auth/login/success}
     auth-error-path: ${FRONTEND_AUTH_ERROR_PATH:/auth/login/error}
+
+    # 허용된 redirect URI 화이트리스트 (Open Redirect 공격 방지)
+    # base-url은 항상 허용되므로 추가 URL만 등록
+    allowed-redirect-uris:
+      - http://localhost:3000/login
+      - http://localhost/login
+
+  cookie:
+    # 쿠키 보안 설정 (Refresh Token 전용)
+    # Access Token은 Response Body로 전달 (Bearer 헤더 방식)
+    secure: false              # Local: HTTP 허용, Production: true (HTTPS 전용)
+    same-site: Strict          # CSRF 방어 (Strict/Lax/None)
+    path: /                    # 쿠키 경로
+    domain:                    # 쿠키 도메인 (비어있으면 현재 도메인만)
+
+    # Refresh Token 만료 시간 (초 단위)
+    refresh-token-max-age: 604800   # Refresh Token: 7일
 
 server:
   port: 8081

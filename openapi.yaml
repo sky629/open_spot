@@ -1,4 +1,4 @@
-openapi: 3.0.3
+openapi: 3.1.1
 info:
   title: Open-Spot API
   description: |
@@ -38,7 +38,7 @@ tags:
     description: 알림 관리 API
 
 security:
-  - BearerAuth: []
+  - CookieAuth: []
 
 paths:
   # ========================================
@@ -49,30 +49,46 @@ paths:
       tags:
         - Authentication
       summary: Google OAuth2 로그인 시작
-      description: Google OAuth2 로그인 플로우를 시작합니다.
+      description: |
+        Google OAuth2 로그인 플로우를 시작합니다.
+        로그인 성공 시 프론트엔드로 리다이렉트하며, JWT 토큰이 HttpOnly 쿠키로 설정됩니다.
       operationId: googleLogin
       security: []
       responses:
         '302':
-          description: Google 로그인 페이지로 리다이렉트
+          description: Google 로그인 페이지로 리다이렉트 (성공 시 프론트엔드로 리다이렉트하며 HttpOnly 쿠키 설정)
+          headers:
+            Set-Cookie:
+              description: |
+                로그인 성공 시 JWT 토큰들이 HttpOnly 쿠키로 설정됩니다:
+                - access_token: JWT Access Token (1시간)
+                - refresh_token: JWT Refresh Token (7일)
+              schema:
+                type: string
+                example: access_token=eyJhbGc...; HttpOnly; Secure; Path=/; Max-Age=3600
 
   /api/v1/auth/token/refresh:
     post:
       tags:
         - Authentication
       summary: JWT 토큰 갱신
-      description: Refresh 토큰을 사용하여 새로운 Access 토큰을 발급받습니다.
+      description: |
+        HttpOnly 쿠키의 Refresh 토큰을 사용하여 새로운 Access 토큰을 발급받습니다.
+        갱신된 토큰은 응답 본문과 함께 HttpOnly 쿠키로도 설정됩니다.
       operationId: refreshToken
       security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TokenRefreshRequest'
       responses:
         '200':
-          description: 토큰 갱신 성공
+          description: 토큰 갱신 성공 (새로운 토큰이 HttpOnly 쿠키로 설정됨)
+          headers:
+            Set-Cookie:
+              description: |
+                갱신된 토큰들이 HttpOnly 쿠키로 설정됩니다:
+                - access_token: 새로운 Access Token (1시간)
+                - refresh_token: 새로운 Refresh Token (7일)
+              schema:
+                type: string
+                example: access_token=eyJhbGc...; HttpOnly; Secure; Path=/; Max-Age=3600
           content:
             application/json:
               schema:
@@ -90,11 +106,22 @@ paths:
       tags:
         - Authentication
       summary: 로그아웃
-      description: 현재 사용자의 Refresh 토큰을 무효화하여 로그아웃합니다.
+      description: |
+        HttpOnly 쿠키의 토큰을 무효화하여 로그아웃합니다.
+        로그아웃 성공 시 쿠키가 삭제됩니다.
       operationId: logout
       responses:
         '200':
-          description: 로그아웃 성공
+          description: 로그아웃 성공 (HttpOnly 쿠키가 삭제됨)
+          headers:
+            Set-Cookie:
+              description: |
+                토큰 쿠키가 삭제됩니다 (Max-Age=0):
+                - access_token
+                - refresh_token
+              schema:
+                type: string
+                example: access_token=; HttpOnly; Secure; Path=/; Max-Age=0
           content:
             application/json:
               schema:
@@ -516,59 +543,6 @@ paths:
                       data:
                         $ref: '#/components/schemas/LocationSummaryPageResponse'
 
-  # ========================================
-  # Location Groups APIs
-  # ========================================
-  /api/v1/locations/groups:
-    get:
-      tags:
-        - Location Groups
-      summary: 그룹 목록 조회
-      description: 사용자의 모든 그룹 목록을 조회합니다.
-      operationId: getLocationGroups
-      responses:
-        '200':
-          description: 그룹 목록 조회 성공
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/LocationGroupResponse'
-
-    post:
-      tags:
-        - Location Groups
-      summary: 그룹 생성
-      description: 새로운 장소 그룹을 생성합니다.
-      operationId: createLocationGroup
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateLocationGroupRequest'
-      responses:
-        '201':
-          description: 그룹 생성 성공
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/LocationGroupResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-
-  /api/v1/locations/groups/{groupId}:
     put:
       tags:
         - Location Groups
@@ -638,6 +612,58 @@ paths:
                             type: string
         '404':
           $ref: '#/components/responses/NotFound'
+
+  # ========================================
+  # Location Groups APIs
+  # ========================================
+  /api/v1/locations/groups:
+    get:
+      tags:
+        - Location Groups
+      summary: 그룹 목록 조회
+      description: 사용자의 모든 그룹 목록을 조회합니다.
+      operationId: getLocationGroups
+      responses:
+        '200':
+          description: 그룹 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LocationGroupResponse'
+
+    post:
+      tags:
+        - Location Groups
+      summary: 그룹 생성
+      description: 새로운 장소 그룹을 생성합니다.
+      operationId: createLocationGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLocationGroupRequest'
+      responses:
+        '201':
+          description: 그룹 생성 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationGroupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
   /api/v1/locations/groups/reorder:
     put:
@@ -810,10 +836,11 @@ paths:
 
 components:
   securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: HttpOnly 쿠키로 전달되는 JWT Access Token
 
   parameters:
     UserIdParam:
@@ -1049,17 +1076,20 @@ components:
     TokenRefreshResponse:
       type: object
       required:
-        - accessToken
-        - refreshToken
         - accessTokenExpiresIn
+        - message
       properties:
-        accessToken:
-          type: string
-        refreshToken:
-          type: string
         accessTokenExpiresIn:
           type: integer
           format: int64
+          description: 액세스 토큰 만료 시간 (밀리초)
+          example: 3600000
+        message:
+          type: string
+          description: 토큰 갱신 성공 메시지
+          example: Token refreshed successfully
+      description: |
+        토큰 갱신 응답. 실제 토큰은 HttpOnly 쿠키로 전달되므로 Response Body에는 포함되지 않습니다.
 
     LogoutResponse:
       type: object

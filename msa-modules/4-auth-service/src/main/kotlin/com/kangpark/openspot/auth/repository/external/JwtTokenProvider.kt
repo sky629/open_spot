@@ -103,7 +103,30 @@ class JwtTokenProvider(
             null
         }
     }
-    
+
+    /**
+     * 토큰에서 이름 추출
+     */
+    fun getNameFromToken(token: String): String? {
+        return try {
+            val claims = getClaimsFromToken(token)
+            claims["name"] as? String
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * 토큰 발급 시간 조회
+     */
+    fun getIssuedAtFromToken(token: String): Date {
+        return try {
+            getClaimsFromToken(token).issuedAt
+        } catch (e: Exception) {
+            Date()
+        }
+    }
+
     /**
      * 토큰 타입 확인
      */
@@ -157,11 +180,7 @@ class JwtTokenProvider(
     /**
      * 토큰 만료 시간 조회
      */
-    fun getExpirationDateFromToken(token: String): Date? {
-        return try {
-            getClaimsFromToken(token).expiration
-        } catch (e: Exception) {
-            null
-        }
+    fun getExpirationDateFromToken(token: String): Date {
+        return getClaimsFromToken(token).expiration
     }
 }

@@ -13,6 +13,19 @@ else
     echo "⚠️ No .env file found. Using system environment variables."
 fi
 
+# Stop existing services if running
+echo "🔍 Checking for existing services..."
+EXISTING_SERVICES=$(pgrep -f "gradle.*bootRun.*(auth-service|location-service|notification-service)")
+if [ -n "$EXISTING_SERVICES" ]; then
+    echo "🛑 Stopping existing domain services..."
+    pkill -f "gradle.*bootRun.*(auth-service|location-service|notification-service)"
+    echo "⏳ Waiting for services to stop..."
+    sleep 3
+    echo "✅ Existing services stopped"
+else
+    echo "✅ No existing services running"
+fi
+
 # Check if infrastructure is running
 if ! curl -f http://localhost:9999/actuator/health >/dev/null 2>&1; then
     echo "❌ Config Service is not running. Please start infrastructure first:"
