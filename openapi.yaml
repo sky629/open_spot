@@ -1,0 +1,1642 @@
+openapi: 3.0.3
+info:
+  title: Open-Spot API
+  description: |
+    개인 장소 기록 및 관리 서비스 API
+
+    ## 주요 기능
+    - Google OAuth2 인증
+    - 개인 장소 기록 관리 (평점, 리뷰, 태그)
+    - 장소 그룹 관리
+    - 푸시 알림 관리
+  version: 1.0.0
+  contact:
+    name: Open-Spot Team
+
+servers:
+  - url: http://localhost:8080
+    description: Local Development Gateway
+  - url: http://localhost:8081
+    description: Auth Service (Direct)
+  - url: http://localhost:8082
+    description: Location Service (Direct)
+  - url: http://localhost:8083
+    description: Notification Service (Direct)
+
+tags:
+  - name: Authentication
+    description: 인증 관련 API
+  - name: Users
+    description: 사용자 관리 API
+  - name: Categories
+    description: 카테고리 API
+  - name: Locations
+    description: 장소 관리 API
+  - name: Location Groups
+    description: 장소 그룹 관리 API
+  - name: Notifications
+    description: 알림 관리 API
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ========================================
+  # Authentication APIs
+  # ========================================
+  /api/v1/auth/google/login:
+    get:
+      tags:
+        - Authentication
+      summary: Google OAuth2 로그인 시작
+      description: Google OAuth2 로그인 플로우를 시작합니다.
+      operationId: googleLogin
+      security: []
+      responses:
+        '302':
+          description: Google 로그인 페이지로 리다이렉트
+
+  /api/v1/auth/token/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: JWT 토큰 갱신
+      description: Refresh 토큰을 사용하여 새로운 Access 토큰을 발급받습니다.
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+      responses:
+        '200':
+          description: 토큰 갱신 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenRefreshResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: 로그아웃
+      description: 현재 사용자의 Refresh 토큰을 무효화하여 로그아웃합니다.
+      operationId: logout
+      responses:
+        '200':
+          description: 로그아웃 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LogoutResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ========================================
+  # Users APIs
+  # ========================================
+  /api/v1/users/self:
+    get:
+      tags:
+        - Users
+      summary: 현재 사용자 프로필 조회
+      description: JWT 토큰을 통해 현재 로그인한 사용자의 프로필을 조회합니다.
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: 사용자 프로필 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/users/{userId}:
+    get:
+      tags:
+        - Users
+      summary: 사용자 프로필 조회
+      description: 특정 사용자 ID로 프로필을 조회합니다.
+      operationId: getUserById
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: 사용자 프로필 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ========================================
+  # Categories APIs
+  # ========================================
+  /api/v1/categories:
+    get:
+      tags:
+        - Categories
+      summary: 카테고리 목록 조회
+      description: 사용 가능한 모든 장소 카테고리 목록을 조회합니다.
+      operationId: getCategories
+      security: []
+      responses:
+        '200':
+          description: 카테고리 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CategoryResponse'
+
+  # ========================================
+  # Locations APIs
+  # ========================================
+  /api/v1/locations:
+    get:
+      tags:
+        - Locations
+      summary: 장소 목록 조회
+      description: 다양한 조건으로 장소를 검색합니다.
+      operationId: getLocations
+      parameters:
+        - $ref: '#/components/parameters/NorthEastLatParam'
+        - $ref: '#/components/parameters/NorthEastLonParam'
+        - $ref: '#/components/parameters/SouthWestLatParam'
+        - $ref: '#/components/parameters/SouthWestLonParam'
+        - $ref: '#/components/parameters/LatitudeParam'
+        - $ref: '#/components/parameters/LongitudeParam'
+        - $ref: '#/components/parameters/RadiusMetersParam'
+        - $ref: '#/components/parameters/CategoryIdParam'
+        - $ref: '#/components/parameters/KeywordParam'
+        - $ref: '#/components/parameters/TargetUserIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 장소 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationSummaryPageResponse'
+
+    post:
+      tags:
+        - Locations
+      summary: 새 장소 생성
+      description: 새로운 개인 장소를 등록합니다.
+      operationId: createLocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLocationRequest'
+      responses:
+        '201':
+          description: 장소 생성 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/locations/{locationId}:
+    get:
+      tags:
+        - Locations
+      summary: 장소 상세 조회
+      description: 특정 장소의 상세 정보를 조회합니다.
+      operationId: getLocationById
+      parameters:
+        - $ref: '#/components/parameters/LocationIdParam'
+      responses:
+        '200':
+          description: 장소 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Locations
+      summary: 장소 기본 정보 수정
+      description: 장소의 기본 정보를 수정합니다.
+      operationId: updateLocation
+      parameters:
+        - $ref: '#/components/parameters/LocationIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationRequest'
+      responses:
+        '200':
+          description: 장소 수정 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Locations
+      summary: 장소 비활성화
+      description: 장소를 비활성화합니다 (논리적 삭제).
+      operationId: deleteLocation
+      parameters:
+        - $ref: '#/components/parameters/LocationIdParam'
+      responses:
+        '200':
+          description: 장소 비활성화 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          locationId:
+                            type: string
+                            format: uuid
+                          message:
+                            type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/locations/{locationId}/evaluation:
+    put:
+      tags:
+        - Locations
+      summary: 개인 평가 정보 수정
+      description: 장소에 대한 개인 평점, 리뷰, 태그를 수정합니다.
+      operationId: updateLocationEvaluation
+      parameters:
+        - $ref: '#/components/parameters/LocationIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationEvaluationRequest'
+      responses:
+        '200':
+          description: 평가 정보 수정 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/locations/{locationId}/group:
+    put:
+      tags:
+        - Locations
+      summary: 장소 그룹 변경
+      description: 장소가 속한 그룹을 변경합니다.
+      operationId: changeLocationGroup
+      parameters:
+        - $ref: '#/components/parameters/LocationIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeLocationGroupRequest'
+      responses:
+        '200':
+          description: 그룹 변경 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationResponse'
+
+  /api/v1/locations/{locationId}/coordinates:
+    put:
+      tags:
+        - Locations
+      summary: 장소 좌표 수정
+      description: 장소의 GPS 좌표를 수정합니다.
+      operationId: updateLocationCoordinates
+      parameters:
+        - $ref: '#/components/parameters/LocationIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationCoordinatesRequest'
+      responses:
+        '200':
+          description: 좌표 수정 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationResponse'
+
+  /api/v1/locations/top-rated:
+    get:
+      tags:
+        - Locations
+      summary: 최고 평점 장소 목록
+      description: 내 개인 평점 기준 최고 평점 장소 목록을 조회합니다.
+      operationId: getTopRatedLocations
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 최고 평점 장소 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationSummaryPageResponse'
+
+  /api/v1/locations/recent:
+    get:
+      tags:
+        - Locations
+      summary: 최근 등록 장소 목록
+      description: 최근 등록한 내 장소 목록을 조회합니다.
+      operationId: getRecentLocations
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 최근 등록 장소 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationSummaryPageResponse'
+
+  /api/v1/locations/self:
+    get:
+      tags:
+        - Locations
+      summary: 내 장소 목록
+      description: 내가 생성한 모든 장소 목록을 조회합니다.
+      operationId: getMyLocations
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 내 장소 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationSummaryPageResponse'
+
+  /api/v1/locations/groups/{groupId}:
+    get:
+      tags:
+        - Locations
+      summary: 그룹별 장소 목록
+      description: 특정 그룹에 속한 내 장소 목록을 조회합니다.
+      operationId: getLocationsByGroup
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            nullable: true
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 그룹별 장소 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationSummaryPageResponse'
+
+  # ========================================
+  # Location Groups APIs
+  # ========================================
+  /api/v1/locations/groups:
+    get:
+      tags:
+        - Location Groups
+      summary: 그룹 목록 조회
+      description: 사용자의 모든 그룹 목록을 조회합니다.
+      operationId: getLocationGroups
+      responses:
+        '200':
+          description: 그룹 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LocationGroupResponse'
+
+    post:
+      tags:
+        - Location Groups
+      summary: 그룹 생성
+      description: 새로운 장소 그룹을 생성합니다.
+      operationId: createLocationGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLocationGroupRequest'
+      responses:
+        '201':
+          description: 그룹 생성 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationGroupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/locations/groups/{groupId}:
+    put:
+      tags:
+        - Location Groups
+      summary: 그룹 수정
+      description: 그룹의 기본 정보를 수정합니다.
+      operationId: updateLocationGroup
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationGroupRequest'
+      responses:
+        '200':
+          description: 그룹 수정 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LocationGroupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Location Groups
+      summary: 그룹 삭제
+      description: 그룹을 삭제합니다.
+      operationId: deleteLocationGroup
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 그룹 삭제 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          groupId:
+                            type: string
+                            format: uuid
+                          message:
+                            type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/locations/groups/reorder:
+    put:
+      tags:
+        - Location Groups
+      summary: 그룹 순서 변경
+      description: 드래그 앤 드롭으로 그룹 순서를 변경합니다.
+      operationId: reorderLocationGroups
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderLocationGroupsRequest'
+      responses:
+        '200':
+          description: 그룹 순서 변경 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LocationGroupResponse'
+
+  # ========================================
+  # Notifications APIs
+  # ========================================
+  /api/v1/notifications/tokens:
+    post:
+      tags:
+        - Notifications
+      summary: 디바이스 토큰 등록
+      description: FCM 푸시 알림을 위한 디바이스 토큰을 등록합니다.
+      operationId: registerDeviceToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterTokenRequest'
+      responses:
+        '200':
+          description: 토큰 등록 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RegisterTokenResponse'
+
+  /api/v1/notifications:
+    get:
+      tags:
+        - Notifications
+      summary: 알림 목록 조회
+      description: 사용자의 알림 목록을 페이지네이션으로 조회합니다.
+      operationId: getNotifications
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 알림 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/NotificationPageResponse'
+
+  /api/v1/notifications/unread-count:
+    get:
+      tags:
+        - Notifications
+      summary: 읽지 않은 알림 수 조회
+      description: 사용자의 읽지 않은 알림 개수를 조회합니다.
+      operationId: getUnreadNotificationCount
+      responses:
+        '200':
+          description: 읽지 않은 알림 수 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UnreadCountResponse'
+
+  /api/v1/notifications/{notificationId}/read:
+    put:
+      tags:
+        - Notifications
+      summary: 알림 읽음 처리
+      description: 특정 알림을 읽음 상태로 변경합니다.
+      operationId: markNotificationAsRead
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 알림 읽음 처리 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/notifications/settings:
+    get:
+      tags:
+        - Notifications
+      summary: 알림 설정 조회
+      description: 사용자의 알림 설정을 조회합니다.
+      operationId: getNotificationSettings
+      responses:
+        '200':
+          description: 알림 설정 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/NotificationSettingsResponse'
+
+    put:
+      tags:
+        - Notifications
+      summary: 알림 설정 업데이트
+      description: 사용자의 알림 설정을 업데이트합니다.
+      operationId: updateNotificationSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsRequest'
+      responses:
+        '200':
+          description: 알림 설정 업데이트 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/NotificationSettingsResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    LocationIdParam:
+      name: locationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    CategoryIdParam:
+      name: categoryId
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+
+    NorthEastLatParam:
+      name: northEastLat
+      in: query
+      required: false
+      schema:
+        type: number
+        format: double
+        minimum: -90
+        maximum: 90
+
+    NorthEastLonParam:
+      name: northEastLon
+      in: query
+      required: false
+      schema:
+        type: number
+        format: double
+        minimum: -180
+        maximum: 180
+
+    SouthWestLatParam:
+      name: southWestLat
+      in: query
+      required: false
+      schema:
+        type: number
+        format: double
+        minimum: -90
+        maximum: 90
+
+    SouthWestLonParam:
+      name: southWestLon
+      in: query
+      required: false
+      schema:
+        type: number
+        format: double
+        minimum: -180
+        maximum: 180
+
+    LatitudeParam:
+      name: latitude
+      in: query
+      required: false
+      schema:
+        type: number
+        format: double
+        minimum: -90
+        maximum: 90
+
+    LongitudeParam:
+      name: longitude
+      in: query
+      required: false
+      schema:
+        type: number
+        format: double
+        minimum: -180
+        maximum: 180
+
+    RadiusMetersParam:
+      name: radiusMeters
+      in: query
+      required: false
+      schema:
+        type: number
+        format: double
+        minimum: 100
+        maximum: 50000
+
+    KeywordParam:
+      name: keyword
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 100
+
+    TargetUserIdParam:
+      name: targetUserId
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+
+    PageParam:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+
+    SizeParam:
+      name: size
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+
+  responses:
+    BadRequest:
+      description: 잘못된 요청
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  error:
+                    $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: 인증 실패
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  error:
+                    $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: 리소스를 찾을 수 없음
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  error:
+                    $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    # ========================================
+    # Common Schemas
+    # ========================================
+    ApiResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          nullable: true
+        error:
+          type: object
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    PageInfo:
+      type: object
+      required:
+        - number
+        - size
+        - totalElements
+        - totalPages
+        - first
+        - last
+      properties:
+        number:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+
+    # ========================================
+    # Authentication Schemas
+    # ========================================
+    TokenRefreshRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+
+    TokenRefreshResponse:
+      type: object
+      required:
+        - accessToken
+        - refreshToken
+        - accessTokenExpiresIn
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        accessTokenExpiresIn:
+          type: integer
+          format: int64
+
+    LogoutResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: Successfully logged out
+
+    # ========================================
+    # User Schemas
+    # ========================================
+    UserResponse:
+      type: object
+      required:
+        - id
+        - socialId
+        - email
+        - name
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        socialId:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        pictureUrl:
+          type: string
+          format: uri
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ========================================
+    # Category Schemas
+    # ========================================
+    CategoryResponse:
+      type: object
+      required:
+        - id
+        - code
+        - displayName
+        - order
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          nullable: true
+        order:
+          type: integer
+
+    CategoryInfo:
+      type: object
+      required:
+        - id
+        - code
+        - displayName
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        displayName:
+          type: string
+        icon:
+          type: string
+          nullable: true
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          nullable: true
+
+    # ========================================
+    # Location Schemas
+    # ========================================
+    CoordinatesResponse:
+      type: object
+      required:
+        - latitude
+        - longitude
+      properties:
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+
+    CreateLocationRequest:
+      type: object
+      required:
+        - name
+        - categoryId
+        - latitude
+        - longitude
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+        address:
+          type: string
+          maxLength: 200
+          nullable: true
+        categoryId:
+          type: string
+          format: uuid
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        iconUrl:
+          type: string
+          format: uri
+          maxLength: 500
+          nullable: true
+        personalRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+        personalReview:
+          type: string
+          maxLength: 2000
+          nullable: true
+        tags:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 20
+        groupId:
+          type: string
+          format: uuid
+          nullable: true
+
+    UpdateLocationRequest:
+      type: object
+      required:
+        - name
+        - categoryId
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+        address:
+          type: string
+          maxLength: 200
+          nullable: true
+        categoryId:
+          type: string
+          format: uuid
+        iconUrl:
+          type: string
+          format: uri
+          maxLength: 500
+          nullable: true
+
+    UpdateLocationEvaluationRequest:
+      type: object
+      properties:
+        personalRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+        personalReview:
+          type: string
+          maxLength: 2000
+          nullable: true
+        tags:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 20
+
+    ChangeLocationGroupRequest:
+      type: object
+      properties:
+        groupId:
+          type: string
+          format: uuid
+          nullable: true
+
+    UpdateLocationCoordinatesRequest:
+      type: object
+      required:
+        - latitude
+        - longitude
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+
+    LocationResponse:
+      type: object
+      required:
+        - id
+        - userId
+        - name
+        - categoryId
+        - category
+        - coordinates
+        - isActive
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        categoryId:
+          type: string
+          format: uuid
+        category:
+          $ref: '#/components/schemas/CategoryInfo'
+        coordinates:
+          $ref: '#/components/schemas/CoordinatesResponse'
+        iconUrl:
+          type: string
+          format: uri
+          nullable: true
+        personalRating:
+          type: integer
+          nullable: true
+        personalReview:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        groupId:
+          type: string
+          format: uuid
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        distance:
+          type: number
+          format: double
+          nullable: true
+
+    LocationSummaryResponse:
+      type: object
+      required:
+        - id
+        - name
+        - categoryId
+        - category
+        - coordinates
+        - tags
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        categoryId:
+          type: string
+          format: uuid
+        category:
+          $ref: '#/components/schemas/CategoryInfo'
+        coordinates:
+          $ref: '#/components/schemas/CoordinatesResponse'
+        personalRating:
+          type: integer
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        distance:
+          type: number
+          format: double
+          nullable: true
+
+    LocationSummaryPageResponse:
+      type: object
+      required:
+        - content
+        - page
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocationSummaryResponse'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+
+    # ========================================
+    # Location Group Schemas
+    # ========================================
+    CreateLocationGroupRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+          nullable: true
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          nullable: true
+        icon:
+          type: string
+          maxLength: 50
+          nullable: true
+
+    UpdateLocationGroupRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+          nullable: true
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          nullable: true
+        icon:
+          type: string
+          maxLength: 50
+          nullable: true
+
+    ReorderLocationGroupsRequest:
+      type: object
+      required:
+        - groupOrders
+      properties:
+        groupOrders:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupOrderItem'
+
+    GroupOrderItem:
+      type: object
+      required:
+        - groupId
+        - order
+      properties:
+        groupId:
+          type: string
+          format: uuid
+        order:
+          type: integer
+          minimum: 0
+
+    LocationGroupResponse:
+      type: object
+      required:
+        - id
+        - userId
+        - name
+        - order
+        - isShared
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+        order:
+          type: integer
+        isShared:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ========================================
+    # Notification Schemas
+    # ========================================
+    RegisterTokenRequest:
+      type: object
+      required:
+        - token
+        - deviceType
+      properties:
+        token:
+          type: string
+        deviceType:
+          type: string
+          enum: [WEB, ANDROID, IOS]
+        deviceId:
+          type: string
+          nullable: true
+
+    RegisterTokenResponse:
+      type: object
+      required:
+        - id
+        - token
+        - deviceType
+        - isActive
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        token:
+          type: string
+        deviceType:
+          type: string
+          enum: [WEB, ANDROID, IOS]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    NotificationResponse:
+      type: object
+      required:
+        - id
+        - title
+        - body
+        - notificationType
+        - isRead
+        - isSent
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        body:
+          type: string
+        notificationType:
+          type: string
+          enum: [REPORT_COMPLETE, SYSTEM_NOTICE]
+        referenceId:
+          type: string
+          format: uuid
+          nullable: true
+        isRead:
+          type: boolean
+        isSent:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    NotificationPageResponse:
+      type: object
+      required:
+        - content
+        - page
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationResponse'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+
+    UnreadCountResponse:
+      type: object
+      required:
+        - unreadCount
+      properties:
+        unreadCount:
+          type: integer
+          format: int64
+
+    NotificationSettingsResponse:
+      type: object
+      required:
+        - reportEnabled
+        - systemEnabled
+      properties:
+        reportEnabled:
+          type: boolean
+        systemEnabled:
+          type: boolean
+
+    UpdateSettingsRequest:
+      type: object
+      required:
+        - reportEnabled
+        - systemEnabled
+      properties:
+        reportEnabled:
+          type: boolean
+        systemEnabled:
+          type: boolean
