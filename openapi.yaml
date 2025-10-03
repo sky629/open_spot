@@ -5,10 +5,14 @@ info:
     개인 장소 기록 및 관리 서비스 API
 
     ## 주요 기능
-    - Google OAuth2 인증
+    - Google OAuth2 인증 (Bearer Token + HttpOnly Cookie)
     - 개인 장소 기록 관리 (평점, 리뷰, 태그)
     - 장소 그룹 관리
     - 푸시 알림 관리
+
+    ## 인증 방식
+    - **Access Token**: Authorization 헤더로 전달 (Bearer 방식)
+    - **Refresh Token**: HttpOnly Cookie로 전달 (XSS 방어)
   version: 1.0.0
   contact:
     name: Open-Spot Team
@@ -38,7 +42,7 @@ tags:
     description: 알림 관리 API
 
 security:
-  - CookieAuth: []
+  - BearerAuth: []
 
 paths:
   # ========================================
@@ -51,21 +55,44 @@ paths:
       summary: Google OAuth2 로그인 시작
       description: |
         Google OAuth2 로그인 플로우를 시작합니다.
-        로그인 성공 시 프론트엔드로 리다이렉트하며, JWT 토큰이 HttpOnly 쿠키로 설정됩니다.
+        로그인 성공 시 프론트엔드로 리다이렉트하며, Access Token은 URL 쿼리 파라미터로, Refresh Token은 HttpOnly 쿠키로 전달됩니다.
+
+        **리다이렉트 예시**:
+        `http://localhost:3000/auth/login/success?access_token=eyJhbGc...&new_user=false`
+
+        **프론트엔드 처리**:
+        1. URL 쿼리에서 `access_token` 추출
+        2. 메모리 또는 localStorage에 저장
+        3. 이후 API 요청 시 `Authorization: Bearer <access_token>` 헤더 사용
       operationId: googleLogin
+      parameters:
+        - name: redirect_uri
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+          description: 로그인 성공 후 리다이렉트할 URL (화이트리스트에 등록된 URL만 허용)
       security: []
       responses:
         '302':
-          description: Google 로그인 페이지로 리다이렉트 (성공 시 프론트엔드로 리다이렉트하며 HttpOnly 쿠키 설정)
+          description: |
+            Google 로그인 페이지로 리다이렉트 → 로그인 성공 시 프론트엔드로 리다이렉트
+            - Access Token: URL 쿼리 파라미터 (`?access_token=xxx&new_user=false`)
+            - Refresh Token: HttpOnly Cookie
           headers:
             Set-Cookie:
               description: |
-                로그인 성공 시 JWT 토큰들이 HttpOnly 쿠키로 설정됩니다:
-                - access_token: JWT Access Token (1시간)
-                - refresh_token: JWT Refresh Token (7일)
+                Refresh Token만 HttpOnly 쿠키로 설정됩니다:
+                - refresh_token: JWT Refresh Token (7일, HttpOnly, Secure, SameSite=Strict)
               schema:
                 type: string
-                example: access_token=eyJhbGc...; HttpOnly; Secure; Path=/; Max-Age=3600
+                example: refresh_token=eyJhbGc...; HttpOnly; Secure; Path=/; SameSite=Strict; Max-Age=604800
+            Location:
+              description: 프론트엔드 리다이렉트 URL (Access Token 포함)
+              schema:
+                type: string
+                example: http://localhost:3000/auth/login/success?access_token=eyJhbGc...&new_user=false
 
   /api/v1/auth/token/refresh:
     post:
@@ -73,22 +100,30 @@ paths:
         - Authentication
       summary: JWT 토큰 갱신
       description: |
-        HttpOnly 쿠키의 Refresh 토큰을 사용하여 새로운 Access 토큰을 발급받습니다.
-        갱신된 토큰은 응답 본문과 함께 HttpOnly 쿠키로도 설정됩니다.
+        HttpOnly 쿠키의 Refresh Token을 사용하여 새로운 Access Token을 발급받습니다.
+
+        **요청**: Refresh Token은 자동으로 쿠키에서 읽힘
+        **응답**:
+        - Access Token: Response Body (프론트엔드에서 메모리 저장)
+        - Refresh Token: HttpOnly Cookie (자동 갱신)
+
+        **프론트엔드 처리**:
+        1. Response Body에서 `accessToken` 추출
+        2. 메모리 또는 localStorage에 저장
+        3. 이후 API 요청 시 `Authorization: Bearer <accessToken>` 헤더 사용
       operationId: refreshToken
       security: []
       responses:
         '200':
-          description: 토큰 갱신 성공 (새로운 토큰이 HttpOnly 쿠키로 설정됨)
+          description: 토큰 갱신 성공 (Access Token은 Response Body, Refresh Token은 HttpOnly 쿠키)
           headers:
             Set-Cookie:
               description: |
-                갱신된 토큰들이 HttpOnly 쿠키로 설정됩니다:
-                - access_token: 새로운 Access Token (1시간)
-                - refresh_token: 새로운 Refresh Token (7일)
+                갱신된 Refresh Token만 HttpOnly 쿠키로 설정됩니다:
+                - refresh_token: 새로운 Refresh Token (7일, HttpOnly, Secure, SameSite=Strict)
               schema:
                 type: string
-                example: access_token=eyJhbGc...; HttpOnly; Secure; Path=/; Max-Age=3600
+                example: refresh_token=eyJhbGc...; HttpOnly; Secure; Path=/; SameSite=Strict; Max-Age=604800
           content:
             application/json:
               schema:
@@ -98,6 +133,12 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/TokenRefreshResponse'
+              example:
+                success: true
+                data:
+                  accessToken: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI...
+                  accessTokenExpiresIn: 3600000
+                  message: Token refreshed successfully
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -107,21 +148,25 @@ paths:
         - Authentication
       summary: 로그아웃
       description: |
-        HttpOnly 쿠키의 토큰을 무효화하여 로그아웃합니다.
-        로그아웃 성공 시 쿠키가 삭제됩니다.
+        Bearer Token을 검증하고 Redis의 Refresh Token을 무효화합니다.
+        HttpOnly Cookie의 Refresh Token도 삭제됩니다.
+
+        **요청**: `Authorization: Bearer <access-token>` 헤더 필요
+        **응답**: Refresh Token 쿠키 삭제
       operationId: logout
+      security:
+        - BearerAuth: []
       responses:
         '200':
-          description: 로그아웃 성공 (HttpOnly 쿠키가 삭제됨)
+          description: 로그아웃 성공 (Refresh Token 쿠키가 삭제됨)
           headers:
             Set-Cookie:
               description: |
-                토큰 쿠키가 삭제됩니다 (Max-Age=0):
-                - access_token
+                Refresh Token 쿠키가 삭제됩니다 (Max-Age=0):
                 - refresh_token
               schema:
                 type: string
-                example: access_token=; HttpOnly; Secure; Path=/; Max-Age=0
+                example: refresh_token=; HttpOnly; Secure; Path=/; SameSite=Strict; Max-Age=0
           content:
             application/json:
               schema:
@@ -131,6 +176,10 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/LogoutResponse'
+              example:
+                success: true
+                data:
+                  message: Successfully logged out
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -836,11 +885,18 @@ paths:
 
 components:
   securitySchemes:
-    CookieAuth:
-      type: apiKey
-      in: cookie
-      name: access_token
-      description: HttpOnly 쿠키로 전달되는 JWT Access Token
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT Access Token을 Authorization 헤더로 전달합니다.
+
+        **사용법**: `Authorization: Bearer <access-token>`
+
+        **토큰 획득**:
+        1. Google 로그인 성공 시 URL 쿼리 파라미터로 전달
+        2. 토큰 갱신 API 응답 본문에서 획득
 
   parameters:
     UserIdParam:
@@ -1065,20 +1121,17 @@ components:
     # ========================================
     # Authentication Schemas
     # ========================================
-    TokenRefreshRequest:
-      type: object
-      required:
-        - refreshToken
-      properties:
-        refreshToken:
-          type: string
-
     TokenRefreshResponse:
       type: object
       required:
+        - accessToken
         - accessTokenExpiresIn
         - message
       properties:
+        accessToken:
+          type: string
+          description: 새로 발급된 JWT Access Token (프론트엔드 메모리에 저장)
+          example: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI5ZjY3YzJmZi0zYjJhLTQ5NzUtYjEyZi1lNmM4ZDQwYjk3YjEiLCJleHAiOjE3MzA1NzI3MDAsImlhdCI6MTczMDU2OTEwMH0.xxx
         accessTokenExpiresIn:
           type: integer
           format: int64
@@ -1089,7 +1142,9 @@ components:
           description: 토큰 갱신 성공 메시지
           example: Token refreshed successfully
       description: |
-        토큰 갱신 응답. 실제 토큰은 HttpOnly 쿠키로 전달되므로 Response Body에는 포함되지 않습니다.
+        토큰 갱신 응답.
+        - Access Token: Response Body (프론트엔드에서 메모리/localStorage 저장)
+        - Refresh Token: HttpOnly Cookie (자동 갱신)
 
     LogoutResponse:
       type: object

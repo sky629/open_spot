@@ -35,8 +35,6 @@ open class LocationSecurityConfig {
                     // All other requests require authentication
                     .anyRequest().authenticated()
             }
-            // TODO: JWT 토큰 필터 추가 예정
-            // .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
             .build()
     }
 }

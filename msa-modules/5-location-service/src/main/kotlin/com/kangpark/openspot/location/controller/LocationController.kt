@@ -27,6 +27,92 @@ class LocationController(
 ) {
     private val logger = LoggerFactory.getLogger(LocationController::class.java)
 
+    @Operation(
+        summary = "장소 목록 조회",
+        description = """
+            다양한 조건으로 장소를 조회합니다.
+            - bounds 파라미터: 지도 영역 내 검색 (우선순위 1)
+            - radius 파라미터: 반경 검색 (우선순위 2)
+            - categoryId: 카테고리 필터
+            - keyword: 키워드 검색
+            - targetUserId: 조회할 사용자 (미지정 시 본인, 향후 친구 기능용)
+        """
+    )
+    @GetMapping
+    fun getLocations(
+        @Parameter(description = "검색 조건")
+        @ModelAttribute request: LocationSearchRequest,
+        @Parameter(description = "사용자 ID", required = true)
+        @RequestHeader("X-User-Id") userId: UUID,
+        @PageableDefault(size = 20) pageable: Pageable
+    ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
+        // 조회 대상 사용자 (향후 친구 기능 확장용)
+        val targetUserId = request.targetUserId ?: userId
+
+        val locationPage = when {
+            // 1. 지도 영역(bounds) 검색 (우선순위 최상)
+            request.hasBounds() -> {
+                locationApplicationService.searchLocationsByBounds(
+                    userId = targetUserId,
+                    northEastLat = request.northEastLat!!,
+                    northEastLon = request.northEastLon!!,
+                    southWestLat = request.southWestLat!!,
+                    southWestLon = request.southWestLon!!,
+                    categoryId = request.categoryId,
+                    pageable = pageable
+                )
+            }
+            // 2. 반경 검색
+            request.hasRadius() -> {
+                locationApplicationService.searchLocationsByRadius(
+                    userId = targetUserId,
+                    latitude = request.latitude!!,
+                    longitude = request.longitude!!,
+                    radiusMeters = request.radiusMeters!!,
+                    categoryId = request.categoryId,
+                    pageable = pageable
+                )
+            }
+            // 3. 카테고리 검색
+            request.categoryId != null -> {
+                locationApplicationService.getLocationsByCategory(targetUserId, request.categoryId, pageable)
+            }
+            // 4. 키워드 검색
+            !request.keyword.isNullOrBlank() -> {
+                locationApplicationService.searchLocationsByKeyword(targetUserId, request.keyword, pageable)
+            }
+            // 5. 기본: 최근 등록순
+            else -> {
+                locationApplicationService.getRecentLocations(targetUserId, pageable)
+            }
+        }
+
+        val responseList = locationPage.content.map { (location, category) ->
+            val distance = if (request.latitude != null && request.longitude != null) {
+                location.distanceTo(
+                    Coordinates.of(
+                        request.latitude, request.longitude
+                    )
+                )
+            } else null
+
+            LocationSummaryResponse.from(location, category, distance)
+        }
+
+        val pageResponse = PageResponse(
+            content = responseList,
+            page = PageInfo(
+                number = locationPage.number,
+                size = locationPage.size,
+                totalElements = locationPage.totalElements,
+                totalPages = locationPage.totalPages,
+                first = locationPage.isFirst,
+                last = locationPage.isLast
+            )
+        )
+        return ResponseEntity.ok(ApiResponse.success(pageResponse))
+    }
+
     @Operation(summary = "새 장소 생성", description = "사용자가 새로운 개인 장소를 등록합니다.")
     @PostMapping
     fun createLocation(
@@ -306,91 +392,6 @@ class LocationController(
         }
     }
 
-    @Operation(
-        summary = "장소 목록 조회",
-        description = """
-            다양한 조건으로 장소를 조회합니다.
-            - bounds 파라미터: 지도 영역 내 검색 (우선순위 1)
-            - radius 파라미터: 반경 검색 (우선순위 2)
-            - categoryId: 카테고리 필터
-            - keyword: 키워드 검색
-            - targetUserId: 조회할 사용자 (미지정 시 본인, 향후 친구 기능용)
-        """
-    )
-    @GetMapping
-    fun getLocations(
-        @Parameter(description = "검색 조건")
-        @ModelAttribute request: LocationSearchRequest,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID,
-        @PageableDefault(size = 20) pageable: Pageable
-    ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        // 조회 대상 사용자 (향후 친구 기능 확장용)
-        val targetUserId = request.targetUserId ?: userId
-
-        val locationPage = when {
-            // 1. 지도 영역(bounds) 검색 (우선순위 최상)
-            request.hasBounds() -> {
-                locationApplicationService.searchLocationsByBounds(
-                    userId = targetUserId,
-                    northEastLat = request.northEastLat!!,
-                    northEastLon = request.northEastLon!!,
-                    southWestLat = request.southWestLat!!,
-                    southWestLon = request.southWestLon!!,
-                    categoryId = request.categoryId,
-                    pageable = pageable
-                )
-            }
-            // 2. 반경 검색
-            request.hasRadius() -> {
-                locationApplicationService.searchLocationsByRadius(
-                    userId = targetUserId,
-                    latitude = request.latitude!!,
-                    longitude = request.longitude!!,
-                    radiusMeters = request.radiusMeters!!,
-                    categoryId = request.categoryId,
-                    pageable = pageable
-                )
-            }
-            // 3. 카테고리 검색
-            request.categoryId != null -> {
-                locationApplicationService.getLocationsByCategory(targetUserId, request.categoryId, pageable)
-            }
-            // 4. 키워드 검색
-            !request.keyword.isNullOrBlank() -> {
-                locationApplicationService.searchLocationsByKeyword(targetUserId, request.keyword, pageable)
-            }
-            // 5. 기본: 최근 등록순
-            else -> {
-                locationApplicationService.getRecentLocations(targetUserId, pageable)
-            }
-        }
-
-        val responseList = locationPage.content.map { (location, category) ->
-            val distance = if (request.latitude != null && request.longitude != null) {
-                location.distanceTo(
-                    Coordinates.of(
-                        request.latitude, request.longitude
-                    )
-                )
-            } else null
-
-            LocationSummaryResponse.from(location, category, distance)
-        }
-
-        val pageResponse = PageResponse(
-            content = responseList,
-            page = PageInfo(
-                number = locationPage.number,
-                size = locationPage.size,
-                totalElements = locationPage.totalElements,
-                totalPages = locationPage.totalPages,
-                first = locationPage.isFirst,
-                last = locationPage.isLast
-            )
-        )
-        return ResponseEntity.ok(ApiResponse.success(pageResponse))
-    }
 
     @Operation(summary = "최고 평점 장소 목록", description = "내 개인 평점 기준 최고 평점 장소 목록을 조회합니다.")
     @GetMapping("/top-rated")
