@@ -32,12 +32,12 @@ interface CategoryRepository {
     /**
      * 활성화된 모든 카테고리 조회 (순서대로)
      */
-    fun findAllActiveOrderByOrder(): List<Category>
+    fun findAllActiveOrderByDisplayOrder(): List<Category>
 
     /**
      * 모든 카테고리 조회 (순서대로)
      */
-    fun findAllOrderByOrder(): List<Category>
+    fun findAllOrderByDisplayOrder(): List<Category>
 
     /**
      * 카테고리 코드 존재 여부 확인

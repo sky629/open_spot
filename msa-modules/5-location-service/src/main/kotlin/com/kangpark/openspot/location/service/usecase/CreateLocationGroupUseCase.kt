@@ -34,7 +34,7 @@ class CreateLocationGroupUseCase(
             throw IllegalArgumentException("이미 존재하는 그룹명입니다: $name")
         }
 
-        // 마지막 order 값 가져오기 (+1)
+        // 마지막 displayOrder 값 가져오기 (+1)
         val maxOrder = locationGroupRepository.findMaxOrderByUserId(userId) ?: -1
         val newOrder = maxOrder + 1
 
@@ -44,12 +44,12 @@ class CreateLocationGroupUseCase(
             description = description,
             color = color,
             icon = icon,
-            order = newOrder
+            displayOrder = newOrder
         )
 
         val savedGroup = locationGroupRepository.save(locationGroup)
 
-        logger.info("Location group created successfully: id={}, order={}", savedGroup.id, savedGroup.order)
+        logger.info("Location group created successfully: id={}, displayOrder={}", savedGroup.id, savedGroup.displayOrder)
         return savedGroup
     }
 }

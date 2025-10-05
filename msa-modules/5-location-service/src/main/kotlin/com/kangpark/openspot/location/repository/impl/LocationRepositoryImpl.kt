@@ -17,15 +17,7 @@ class LocationRepositoryImpl(
 ) : LocationRepository {
 
     override fun save(location: Location): Location {
-        // 새로운 엔터티인지 확인
-        val isNew = getIdFromDomain(location) == null
-
-        val jpaEntity = if (isNew) {
-            LocationJpaEntity.fromDomain(location)
-        } else {
-            LocationJpaEntity.fromDomainWithId(location)
-        }
-
+        val jpaEntity = LocationJpaEntity.fromDomain(location)
         val savedEntity = locationJpaRepository.save(jpaEntity)
         return savedEntity.toDomain()
     }
@@ -124,16 +116,4 @@ class LocationRepositoryImpl(
         return locationJpaRepository.existsById(id)
     }
 
-    /**
-     * Domain Entity에서 ID 추출 (reflection 사용)
-     */
-    private fun getIdFromDomain(location: Location): UUID? {
-        return try {
-            val idField = Location::class.java.superclass.getDeclaredField("id")
-            idField.isAccessible = true
-            idField.get(location) as UUID?
-        } catch (e: Exception) {
-            null
-        }
-    }
 }

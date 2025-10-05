@@ -19,7 +19,7 @@ class LocationGroupRepositoryImpl(
 
     @Transactional
     override fun save(locationGroup: LocationGroup): LocationGroup {
-        val jpaEntity = LocationGroupJpaEntity.fromDomainWithId(locationGroup)
+        val jpaEntity = LocationGroupJpaEntity.fromDomain(locationGroup)
         val saved = jpaRepository.save(jpaEntity)
         return saved.toDomain()
     }
@@ -30,8 +30,8 @@ class LocationGroupRepositoryImpl(
             .orElse(null)
     }
 
-    override fun findByUserIdOrderByOrder(userId: UUID): List<LocationGroup> {
-        return jpaRepository.findByUserIdOrderByOrderAsc(userId)
+    override fun findByUserIdOrderByDisplayOrder(userId: UUID): List<LocationGroup> {
+        return jpaRepository.findByUserIdOrderByDisplayOrderAsc(userId)
             .map { it.toDomain() }
     }
 
@@ -50,7 +50,7 @@ class LocationGroupRepositoryImpl(
 
     @Transactional
     override fun updateOrders(groups: List<LocationGroup>): List<LocationGroup> {
-        val jpaEntities = groups.map { LocationGroupJpaEntity.fromDomainWithId(it) }
+        val jpaEntities = groups.map { LocationGroupJpaEntity.fromDomain(it) }
         val saved = jpaRepository.saveAll(jpaEntities)
         return saved.map { it.toDomain() }
     }

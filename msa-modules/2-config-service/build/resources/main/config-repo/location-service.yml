@@ -59,8 +59,8 @@ resilience4j:
 
 logging:
   level:
-    root: DEBUG
-    org.springframework: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.web: DEBUG
-    com.kangpark.openspot: DEBUG
+    root: INFO
+    org.springframework: INFO
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    com.kangpark.openspot: INFO

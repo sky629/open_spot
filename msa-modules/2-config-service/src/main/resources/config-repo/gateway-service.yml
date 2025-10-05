@@ -24,10 +24,10 @@ management:
 
 logging:
   level:
-    root: DEBUG
-    org.springframework: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.web: DEBUG
-    org.springframework.security.oauth2: DEBUG
-    com.kangpark.openspot: DEBUG
-    com.nimbusds: DEBUG
+    root: INFO
+    org.springframework: INFO
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    org.springframework.security.oauth2: INFO
+    com.kangpark.openspot: INFO
+    com.nimbusds: INFO

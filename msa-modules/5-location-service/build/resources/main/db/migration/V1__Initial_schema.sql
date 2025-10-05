@@ -16,7 +16,7 @@ CREATE TABLE location.categories (
     description TEXT,
     icon VARCHAR(50),
     color VARCHAR(7),  -- #RRGGBB 형식
-    "order" INTEGER NOT NULL DEFAULT 0,
+    display_order INTEGER NOT NULL DEFAULT 0,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -30,7 +30,7 @@ COMMENT ON COLUMN location.categories.code IS '카테고리 코드 (RESTAURANT, 
 COMMENT ON COLUMN location.categories.display_name IS '표시명 (음식점, 카페 등)';
 
 -- 기본 카테고리 데이터 INSERT
-INSERT INTO location.categories (code, display_name, description, icon, color, "order") VALUES
+INSERT INTO location.categories (code, display_name, description, icon, color, display_order) VALUES
 ('RESTAURANT', '음식점', '식당, 레스토랑, 요리점 등', 'restaurant', '#FF5722', 1),
 ('CAFE', '카페', '커피숍, 디저트 카페, 베이커리 등', 'local_cafe', '#795548', 2),
 ('SHOPPING', '쇼핑', '마트, 백화점, 쇼핑몰, 전문매장 등', 'shopping_cart', '#E91E63', 3),
@@ -50,7 +50,7 @@ CREATE TABLE location.location_groups (
     description VARCHAR(500),
     color VARCHAR(7),  -- #RRGGBB 형식
     icon VARCHAR(50),
-    "order" INTEGER NOT NULL DEFAULT 0,
+    display_order INTEGER NOT NULL DEFAULT 0,
     is_shared BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -59,12 +59,12 @@ CREATE TABLE location.location_groups (
 );
 
 CREATE INDEX idx_location_group_user_id ON location.location_groups(user_id);
-CREATE INDEX idx_location_group_user_order ON location.location_groups(user_id, "order");
+CREATE INDEX idx_location_group_user_order ON location.location_groups(user_id, display_order);
 
 COMMENT ON TABLE location.location_groups IS '사용자의 장소 그룹 (맛집, 카페 등)';
 COMMENT ON COLUMN location.location_groups.user_id IS '그룹 소유자 ID';
 COMMENT ON COLUMN location.location_groups.name IS '그룹명';
-COMMENT ON COLUMN location.location_groups."order" IS '표시 순서';
+COMMENT ON COLUMN location.location_groups.display_order IS '표시 순서';
 
 -- 3. Locations 테이블 생성 (개인 장소 기록)
 CREATE TABLE location.locations (

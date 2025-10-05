@@ -4,7 +4,6 @@ import com.kangpark.openspot.common.core.domain.BaseEntity
 import com.kangpark.openspot.location.domain.entity.LocationGroup
 import jakarta.persistence.*
 import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.annotations.UuidGenerator
 import org.hibernate.type.SqlTypes
 import org.springframework.data.annotation.CreatedDate
 import org.springframework.data.annotation.LastModifiedDate
@@ -22,7 +21,7 @@ import java.util.*
     schema = "location",
     indexes = [
         Index(name = "idx_location_group_user_id", columnList = "user_id"),
-        Index(name = "idx_location_group_user_order", columnList = "user_id,order")
+        Index(name = "idx_location_group_user_order", columnList = "user_id,display_order")
     ],
     uniqueConstraints = [
         UniqueConstraint(name = "uk_location_group_user_name", columnNames = ["user_id", "name"])
@@ -32,10 +31,9 @@ import java.util.*
 class LocationGroupJpaEntity(
 
     @Id
-    @UuidGenerator(style = UuidGenerator.Style.TIME)
     @JdbcTypeCode(SqlTypes.UUID)
     @Column(name = "id", nullable = false, updatable = false, columnDefinition = "uuid")
-    val id: UUID? = null,
+    val id: UUID,
 
     @Column(name = "user_id", nullable = false)
     val userId: UUID,
@@ -52,8 +50,8 @@ class LocationGroupJpaEntity(
     @Column(name = "icon", length = 50)
     val icon: String? = null,
 
-    @Column(name = "order", nullable = false)
-    val order: Int = 0,
+    @Column(name = "display_order", nullable = false)
+    val displayOrder: Int = 0,
 
     @Column(name = "is_shared", nullable = false)
     val isShared: Boolean = false,
@@ -77,10 +75,10 @@ class LocationGroupJpaEntity(
             description = description,
             color = color,
             icon = icon,
-            order = order,
+            displayOrder = displayOrder,
             isShared = isShared,
             baseEntity = BaseEntity(
-                id = this.id!!,
+                id = this.id,
                 createdAt = this.createdAt,
                 updatedAt = this.updatedAt
             )
@@ -93,28 +91,13 @@ class LocationGroupJpaEntity(
          */
         fun fromDomain(locationGroup: LocationGroup): LocationGroupJpaEntity {
             return LocationGroupJpaEntity(
-                userId = locationGroup.userId,
-                name = locationGroup.name,
-                description = locationGroup.description,
-                color = locationGroup.color,
-                icon = locationGroup.icon,
-                order = locationGroup.order,
-                isShared = locationGroup.isShared
-            )
-        }
-
-        /**
-         * Domain 모델에서 JPA 엔터티로 변환 (업데이트용)
-         */
-        fun fromDomainWithId(locationGroup: LocationGroup): LocationGroupJpaEntity {
-            return LocationGroupJpaEntity(
                 id = locationGroup.id,
                 userId = locationGroup.userId,
                 name = locationGroup.name,
                 description = locationGroup.description,
                 color = locationGroup.color,
                 icon = locationGroup.icon,
-                order = locationGroup.order,
+                displayOrder = locationGroup.displayOrder,
                 isShared = locationGroup.isShared,
                 createdAt = locationGroup.createdAt,
                 updatedAt = locationGroup.updatedAt

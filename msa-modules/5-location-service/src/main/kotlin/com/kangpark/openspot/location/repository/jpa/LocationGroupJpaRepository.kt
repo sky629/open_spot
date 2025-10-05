@@ -14,9 +14,9 @@ import java.util.*
 interface LocationGroupJpaRepository : JpaRepository<LocationGroupJpaEntity, UUID> {
 
     /**
-     * 사용자의 그룹 목록 조회 (order 기준 오름차순 정렬)
+     * 사용자의 그룹 목록 조회 (displayOrder 기준 오름차순 정렬)
      */
-    fun findByUserIdOrderByOrderAsc(userId: UUID): List<LocationGroupJpaEntity>
+    fun findByUserIdOrderByDisplayOrderAsc(userId: UUID): List<LocationGroupJpaEntity>
 
     /**
      * 사용자의 특정 이름을 가진 그룹 존재 여부 확인
@@ -24,8 +24,8 @@ interface LocationGroupJpaRepository : JpaRepository<LocationGroupJpaEntity, UUI
     fun existsByUserIdAndName(userId: UUID, name: String): Boolean
 
     /**
-     * 사용자의 마지막 order 값 조회
+     * 사용자의 마지막 displayOrder 값 조회
      */
-    @Query("SELECT MAX(lg.order) FROM LocationGroupJpaEntity lg WHERE lg.userId = :userId")
+    @Query("SELECT MAX(lg.displayOrder) FROM LocationGroupJpaEntity lg WHERE lg.userId = :userId")
     fun findMaxOrderByUserId(@Param("userId") userId: UUID): Int?
 }

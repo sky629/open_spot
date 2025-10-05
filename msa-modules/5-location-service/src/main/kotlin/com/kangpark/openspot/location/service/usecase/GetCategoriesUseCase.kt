@@ -19,13 +19,13 @@ class GetCategoriesUseCase(
      * 활성화된 모든 카테고리 조회
      */
     fun getActiveCategories(): List<Category> {
-        return categoryRepository.findAllActiveOrderByOrder()
+        return categoryRepository.findAllActiveOrderByDisplayOrder()
     }
 
     /**
      * 모든 카테고리 조회 (관리자용)
      */
     fun getAllCategories(): List<Category> {
-        return categoryRepository.findAllOrderByOrder()
+        return categoryRepository.findAllOrderByDisplayOrder()
     }
 }

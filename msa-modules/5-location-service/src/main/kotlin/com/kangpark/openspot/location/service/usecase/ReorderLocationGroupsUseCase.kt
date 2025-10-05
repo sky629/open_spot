@@ -21,7 +21,7 @@ class ReorderLocationGroupsUseCase(
     /**
      * 그룹들의 순서를 일괄 변경합니다.
      * @param userId 사용자 ID
-     * @param groupIdOrders 그룹 ID와 새로운 order 값의 맵
+     * @param groupIdOrders 그룹 ID와 새로운 displayOrder 값의 맵
      */
     fun execute(
         userId: UUID,
@@ -38,10 +38,10 @@ class ReorderLocationGroupsUseCase(
             }
         }
 
-        // 새로운 order 적용
+        // 새로운 displayOrder 적용
         val reorderedGroups = groups.map { group ->
             val newOrder = groupIdOrders[group.id]
-                ?: throw IllegalArgumentException("그룹 ID에 대한 order 값이 없습니다: ${group.id}")
+                ?: throw IllegalArgumentException("그룹 ID에 대한 displayOrder 값이 없습니다: ${group.id}")
             group.changeOrder(newOrder)
         }
 
@@ -49,6 +49,6 @@ class ReorderLocationGroupsUseCase(
         val savedGroups = locationGroupRepository.updateOrders(reorderedGroups)
 
         logger.info("Location groups reordered successfully: count={}", savedGroups.size)
-        return savedGroups.sortedBy { it.order }
+        return savedGroups.sortedBy { it.displayOrder }
     }
 }

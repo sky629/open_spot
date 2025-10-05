@@ -20,12 +20,12 @@ interface CategoryJpaRepository : JpaRepository<CategoryJpaEntity, UUID> {
     /**
      * 활성화된 카테고리 목록 조회 (순서대로)
      */
-    fun findByIsActiveTrueOrderByOrderAsc(): List<CategoryJpaEntity>
+    fun findByIsActiveTrueOrderByDisplayOrderAsc(): List<CategoryJpaEntity>
 
     /**
      * 모든 카테고리 목록 조회 (순서대로)
      */
-    fun findAllByOrderByOrderAsc(): List<CategoryJpaEntity>
+    fun findAllByOrderByDisplayOrderAsc(): List<CategoryJpaEntity>
 
     /**
      * 카테고리 코드 존재 여부 확인

@@ -5,7 +5,6 @@ import com.kangpark.openspot.location.domain.vo.Coordinates
 import com.kangpark.openspot.location.domain.entity.Location
 import jakarta.persistence.*
 import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.annotations.UuidGenerator
 import org.hibernate.type.SqlTypes
 import org.locationtech.jts.geom.Point
 import org.springframework.data.annotation.CreatedDate
@@ -33,10 +32,9 @@ import java.util.*
 class LocationJpaEntity(
 
     @Id
-    @UuidGenerator(style = UuidGenerator.Style.TIME)
     @JdbcTypeCode(SqlTypes.UUID)
     @Column(name = "id", nullable = false, updatable = false, columnDefinition = "uuid")
-    val id: UUID? = null,
+    val id: UUID,
 
     @Column(name = "user_id", nullable = false)
     val userId: UUID,
@@ -115,7 +113,7 @@ class LocationJpaEntity(
             groupId = groupId,
             isActive = isActive,
             baseEntity = BaseEntity(
-                id = this.id!!,
+                id = this.id,
                 createdAt = this.createdAt,
                 updatedAt = this.updatedAt
             )
@@ -127,28 +125,6 @@ class LocationJpaEntity(
          * Domain 모델에서 JPA 엔터티로 변환
          */
         fun fromDomain(location: Location): LocationJpaEntity {
-            return LocationJpaEntity(
-                userId = location.userId,
-                name = location.name,
-                description = location.description,
-                address = location.address,
-                categoryId = location.categoryId,
-                latitude = location.coordinates.latitude.toDouble(),
-                longitude = location.coordinates.longitude.toDouble(),
-                iconUrl = location.iconUrl,
-                personalRating = location.personalRating,
-                personalReview = location.personalReview,
-                tags = location.tags.toTypedArray(),
-                isFavorite = location.isFavorite,
-                groupId = location.groupId,
-                isActive = location.isActive
-            )
-        }
-
-        /**
-         * Domain 모델에서 JPA 엔터티로 변환 (업데이트용)
-         */
-        fun fromDomainWithId(location: Location): LocationJpaEntity {
             return LocationJpaEntity(
                 id = location.id,
                 userId = location.userId,

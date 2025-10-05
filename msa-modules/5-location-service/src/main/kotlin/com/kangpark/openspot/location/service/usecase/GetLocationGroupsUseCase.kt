@@ -18,11 +18,11 @@ class GetLocationGroupsUseCase(
     private val logger = LoggerFactory.getLogger(GetLocationGroupsUseCase::class.java)
 
     /**
-     * 사용자의 그룹 목록을 order 순서대로 조회합니다.
+     * 사용자의 그룹 목록을 displayOrder 순서대로 조회합니다.
      */
     fun execute(userId: UUID): List<LocationGroup> {
         logger.debug("Getting location groups for user: userId={}", userId)
 
-        return locationGroupRepository.findByUserIdOrderByOrder(userId)
+        return locationGroupRepository.findByUserIdOrderByDisplayOrder(userId)
     }
 }

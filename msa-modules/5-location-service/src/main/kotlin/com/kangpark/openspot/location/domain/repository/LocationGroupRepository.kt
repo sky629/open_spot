@@ -18,9 +18,9 @@ interface LocationGroupRepository {
     fun findById(id: UUID): LocationGroup?
 
     /**
-     * 사용자의 그룹 목록 조회 (order 기준 오름차순 정렬)
+     * 사용자의 그룹 목록 조회 (displayOrder 기준 오름차순 정렬)
      */
-    fun findByUserIdOrderByOrder(userId: UUID): List<LocationGroup>
+    fun findByUserIdOrderByDisplayOrder(userId: UUID): List<LocationGroup>
 
     /**
      * 사용자의 특정 이름을 가진 그룹 존재 여부 확인

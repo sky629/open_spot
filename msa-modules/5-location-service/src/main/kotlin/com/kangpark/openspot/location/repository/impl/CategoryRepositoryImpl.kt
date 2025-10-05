@@ -44,14 +44,14 @@ class CategoryRepositoryImpl(
     }
 
     @Transactional(readOnly = true)
-    override fun findAllActiveOrderByOrder(): List<Category> {
-        return categoryJpaRepository.findByIsActiveTrueOrderByOrderAsc()
+    override fun findAllActiveOrderByDisplayOrder(): List<Category> {
+        return categoryJpaRepository.findByIsActiveTrueOrderByDisplayOrderAsc()
             .map { it.toDomain() }
     }
 
     @Transactional(readOnly = true)
-    override fun findAllOrderByOrder(): List<Category> {
-        return categoryJpaRepository.findAllByOrderByOrderAsc()
+    override fun findAllOrderByDisplayOrder(): List<Category> {
+        return categoryJpaRepository.findAllByOrderByDisplayOrderAsc()
             .map { it.toDomain() }
     }
 

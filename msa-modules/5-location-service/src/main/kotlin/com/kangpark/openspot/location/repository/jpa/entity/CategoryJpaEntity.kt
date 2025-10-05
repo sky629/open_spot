@@ -4,7 +4,6 @@ import com.kangpark.openspot.common.core.domain.BaseEntity
 import com.kangpark.openspot.location.domain.entity.Category
 import jakarta.persistence.*
 import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.annotations.UuidGenerator
 import org.hibernate.type.SqlTypes
 import org.springframework.data.annotation.CreatedDate
 import org.springframework.data.annotation.LastModifiedDate
@@ -29,10 +28,9 @@ import java.util.UUID
 class CategoryJpaEntity(
 
     @Id
-    @UuidGenerator(style = UuidGenerator.Style.TIME)
     @JdbcTypeCode(SqlTypes.UUID)
     @Column(name = "id", nullable = false, updatable = false, columnDefinition = "uuid")
-    val id: UUID? = null,
+    val id: UUID,
 
     @Column(name = "code", nullable = false, unique = true, length = 50)
     val code: String,
@@ -49,8 +47,8 @@ class CategoryJpaEntity(
     @Column(name = "color", length = 7)
     val color: String? = null,
 
-    @Column(name = "\"order\"", nullable = false)
-    val order: Int = 0,
+    @Column(name = "display_order", nullable = false)
+    val displayOrder: Int = 0,
 
     @Column(name = "is_active", nullable = false)
     val isActive: Boolean = true,
@@ -74,10 +72,10 @@ class CategoryJpaEntity(
             description = description,
             icon = icon,
             color = color,
-            order = order,
+            displayOrder = displayOrder,
             isActive = isActive,
             baseEntity = BaseEntity(
-                id = this.id!!,
+                id = this.id,
                 createdAt = this.createdAt,
                 updatedAt = this.updatedAt
             )
@@ -96,7 +94,7 @@ class CategoryJpaEntity(
                 description = category.description,
                 icon = category.icon,
                 color = category.color,
-                order = category.order,
+                displayOrder = category.displayOrder,
                 isActive = category.isActive,
                 createdAt = category.createdAt,
                 updatedAt = category.updatedAt

@@ -15,7 +15,7 @@ data class LocationGroup(
     val description: String? = null,
     val color: String? = null,              // #FF5722 형식
     val icon: String? = null,                // restaurant, cafe 등
-    val order: Int = 0,                      // 표시 순서 (0부터 시작)
+    val displayOrder: Int = 0,               // 표시 순서 (0부터 시작)
     val isShared: Boolean = false,           // 향후 공유 기능용
 
     // BaseEntity 합성
@@ -60,7 +60,7 @@ data class LocationGroup(
         require(newOrder >= 0) { "순서는 0 이상이어야 합니다" }
 
         return copy(
-            order = newOrder,
+            displayOrder = newOrder,
             baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now())
         )
     }
@@ -89,7 +89,7 @@ data class LocationGroup(
             description: String? = null,
             color: String? = null,
             icon: String? = null,
-            order: Int = 0
+            displayOrder: Int = 0
         ): LocationGroup {
             require(name.isNotBlank()) { "그룹명은 필수입니다" }
             require(name.length <= 100) { "그룹명은 100자를 초과할 수 없습니다" }
@@ -98,7 +98,7 @@ data class LocationGroup(
                 require(it.matches(Regex("^#[0-9A-Fa-f]{6}$"))) { "색상은 #RRGGBB 형식이어야 합니다" }
             }
             require(icon?.length ?: 0 <= 50) { "아이콘명은 50자를 초과할 수 없습니다" }
-            require(order >= 0) { "순서는 0 이상이어야 합니다" }
+            require(displayOrder >= 0) { "순서는 0 이상이어야 합니다" }
 
             return LocationGroup(
                 userId = userId,
@@ -106,7 +106,7 @@ data class LocationGroup(
                 description = description,
                 color = color,
                 icon = icon,
-                order = order
+                displayOrder = displayOrder
             )
         }
     }

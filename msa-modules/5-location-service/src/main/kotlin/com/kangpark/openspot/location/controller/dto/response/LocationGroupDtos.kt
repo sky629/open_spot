@@ -46,7 +46,7 @@ data class GroupOrderItem(
     val groupId: UUID,
 
     @field:Min(value = 0, message = "순서는 0 이상이어야 합니다")
-    val order: Int
+    val displayOrder: Int
 )
 
 // Response DTOs
@@ -57,7 +57,7 @@ data class LocationGroupResponse(
     val description: String?,
     val color: String?,
     val icon: String?,
-    val order: Int,
+    val displayOrder: Int,
     val isShared: Boolean,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime
@@ -71,7 +71,7 @@ data class LocationGroupResponse(
                 description = locationGroup.description,
                 color = locationGroup.color,
                 icon = locationGroup.icon,
-                order = locationGroup.order,
+                displayOrder = locationGroup.displayOrder,
                 isShared = locationGroup.isShared,
                 createdAt = locationGroup.createdAt,
                 updatedAt = locationGroup.updatedAt
@@ -85,7 +85,7 @@ data class LocationGroupSummaryResponse(
     val name: String,
     val color: String?,
     val icon: String?,
-    val order: Int,
+    val displayOrder: Int,
     val locationCount: Long = 0
 ) {
     companion object {
@@ -95,7 +95,7 @@ data class LocationGroupSummaryResponse(
                 name = locationGroup.name,
                 color = locationGroup.color,
                 icon = locationGroup.icon,
-                order = locationGroup.order,
+                displayOrder = locationGroup.displayOrder,
                 locationCount = locationCount
             )
         }

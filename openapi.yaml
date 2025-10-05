@@ -1218,7 +1218,7 @@ components:
         - id
         - code
         - displayName
-        - order
+        - displayOrder
       properties:
         id:
           type: string
@@ -1237,7 +1237,7 @@ components:
           type: string
           pattern: '^#[0-9A-Fa-f]{6}$'
           nullable: true
-        order:
+        displayOrder:
           type: integer
 
     CategoryInfo:
@@ -1576,12 +1576,12 @@ components:
       type: object
       required:
         - groupId
-        - order
+        - displayOrder
       properties:
         groupId:
           type: string
           format: uuid
-        order:
+        displayOrder:
           type: integer
           minimum: 0
 
@@ -1591,7 +1591,7 @@ components:
         - id
         - userId
         - name
-        - order
+        - displayOrder
         - isShared
         - createdAt
         - updatedAt
@@ -1613,7 +1613,7 @@ components:
         icon:
           type: string
           nullable: true
-        order:
+        displayOrder:
           type: integer
         isShared:
           type: boolean

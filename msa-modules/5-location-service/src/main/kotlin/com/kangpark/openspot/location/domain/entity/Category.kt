@@ -14,7 +14,7 @@ data class Category(
     val description: String?,
     val icon: String?,
     val color: String?,
-    val order: Int,
+    val displayOrder: Int,
     val isActive: Boolean = true,
 
     // BaseEntity 합성
@@ -29,7 +29,7 @@ data class Category(
     init {
         require(code.isNotBlank()) { "카테고리 코드는 필수입니다" }
         require(displayName.isNotBlank()) { "카테고리 표시명은 필수입니다" }
-        require(order >= 0) { "카테고리 순서는 0 이상이어야 합니다" }
+        require(displayOrder >= 0) { "카테고리 순서는 0 이상이어야 합니다" }
         color?.let {
             require(it.matches(Regex("^#[0-9A-Fa-f]{6}$"))) { "색상은 #RRGGBB 형식이어야 합니다" }
         }
@@ -63,14 +63,14 @@ data class Category(
         description: String? = null,
         icon: String? = null,
         color: String? = null,
-        order: Int? = null
+        displayOrder: Int? = null
     ): Category {
         return copy(
             displayName = displayName ?: this.displayName,
             description = description ?: this.description,
             icon = icon ?: this.icon,
             color = color ?: this.color,
-            order = order ?: this.order,
+            displayOrder = displayOrder ?: this.displayOrder,
             baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now())
         )
     }
@@ -85,7 +85,7 @@ data class Category(
             description: String? = null,
             icon: String? = null,
             color: String? = null,
-            order: Int = 0
+            displayOrder: Int = 0
         ): Category {
             return Category(
                 code = code,
@@ -93,7 +93,7 @@ data class Category(
                 description = description,
                 icon = icon,
                 color = color,
-                order = order,
+                displayOrder = displayOrder,
                 isActive = true
             )
         }

@@ -14,7 +14,7 @@ data class CategoryResponse(
     val description: String?,
     val icon: String?,
     val color: String?,
-    val order: Int
+    val displayOrder: Int
 ) {
     companion object {
         fun from(category: Category): CategoryResponse {
@@ -25,7 +25,7 @@ data class CategoryResponse(
                 description = category.description,
                 icon = category.icon,
                 color = category.color,
-                order = category.order
+                displayOrder = category.displayOrder
             )
         }
     }

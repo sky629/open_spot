@@ -68,7 +68,7 @@ class LocationGroupController(
         }
     }
 
-    @Operation(summary = "그룹 목록 조회", description = "사용자의 모든 그룹 목록을 조회합니다 (order 순서대로).")
+    @Operation(summary = "그룹 목록 조회", description = "사용자의 모든 그룹 목록을 조회합니다 (displayOrder 순서대로).")
     @GetMapping
     fun getGroups(
         @Parameter(description = "사용자 ID (Gateway에서 자동 주입)", hidden = true)
@@ -148,7 +148,7 @@ class LocationGroupController(
     ): ResponseEntity<ApiResponse<List<LocationGroupResponse>>> {
         val userUuid = UUID.fromString(userId)
         return try {
-            val groupIdOrders = request.groupOrders.associate { it.groupId to it.order }
+            val groupIdOrders = request.groupOrders.associate { it.groupId to it.displayOrder }
             val reorderedGroups = reorderLocationGroupsUseCase.execute(userUuid, groupIdOrders)
             val responses = reorderedGroups.map { LocationGroupResponse.from(it) }
             ResponseEntity.ok(ApiResponse.success(responses))
