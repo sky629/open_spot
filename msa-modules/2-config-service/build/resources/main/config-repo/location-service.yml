@@ -56,3 +56,11 @@ resilience4j:
         failure-rate-threshold: 50
         wait-duration-in-open-state: 30s
         sliding-window-size: 10
+
+logging:
+  level:
+    root: DEBUG
+    org.springframework: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    com.kangpark.openspot: DEBUG

@@ -24,20 +24,42 @@ sleep 2
 echo "✅ Checking service health..."
 docker-compose ps
 
+# Health check function
+wait_for_service() {
+    local service_name=$1
+    local url=$2
+    local max_attempts=30
+
+    echo "⏳ Waiting for $service_name to be healthy..."
+    for i in $(seq 1 $max_attempts); do
+        if curl -f -s "$url" > /dev/null 2>&1; then
+            echo "✅ $service_name is ready!"
+            return 0
+        fi
+        echo "   Attempt $i/$max_attempts..."
+        sleep 2
+    done
+    echo "❌ $service_name failed to start!"
+    return 1
+}
+
 echo "🔧 Starting Config Service..."
 ./gradlew :config-service:bootRun --quiet > logs/config-service.log 2>&1 &
 CONFIG_PID=$!
+echo "   Config Service PID: $CONFIG_PID"
 
-echo "⏳ Waiting for Config Service to start..."
-sleep 15
+# Wait for Config Service to be healthy
+wait_for_service "Config Service" "http://localhost:9999/actuator/health" || exit 1
 
 echo "🌐 Starting Gateway Service..."
 ./gradlew :gateway-service:bootRun --quiet > logs/gateway-service.log 2>&1 &
 GATEWAY_PID=$!
+echo "   Gateway Service PID: $GATEWAY_PID"
+
+# Wait for Gateway Service to be healthy
+wait_for_service "Gateway Service" "http://localhost:8080/actuator/health" || exit 1
 
 echo "✅ Infrastructure services started!"
-echo "Config Service PID: $CONFIG_PID"
-echo "Gateway Service PID: $GATEWAY_PID"
 echo ""
 echo "📋 Service URLs:"
 echo "  - Config Server: http://localhost:9999"

@@ -12,8 +12,6 @@ import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
-import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.*
 import java.util.*
 
@@ -30,14 +28,14 @@ class NotificationController(
     @PostMapping("/tokens")
     fun registerToken(
         @Valid @RequestBody request: RegisterTokenRequest,
-        @AuthenticationPrincipal jwt: Jwt
+        @RequestHeader("X-User-Id") userId: String
     ): ApiResponse<RegisterTokenResponse> {
-        val userId = UUID.fromString(jwt.subject)
+        val userUuid = UUID.fromString(userId)
 
-        logger.info("Registering device token for user: {}, deviceType: {}", userId, request.deviceType)
+        logger.info("Registering device token for user: {}, deviceType: {}", userUuid, request.deviceType)
 
         val deviceToken = notificationService.registerDeviceToken(
-            userId = userId,
+            userId = userUuid,
             token = request.token,
             deviceType = request.deviceType,
             deviceId = request.deviceId
@@ -57,15 +55,15 @@ class NotificationController(
     @Operation(summary = "알림 목록 조회", description = "사용자의 알림 목록을 페이지네이션으로 조회합니다.")
     @GetMapping
     fun getNotifications(
-        @AuthenticationPrincipal jwt: Jwt,
+        @RequestHeader("X-User-Id") userId: String,
         @PageableDefault(size = 20) pageable: Pageable
     ): ApiResponse<PageResponse<NotificationResponse>> {
-        val userId = UUID.fromString(jwt.subject)
+        val userUuid = UUID.fromString(userId)
 
         logger.debug("Getting notifications for user: {}, page: {}, size: {}",
-            userId, pageable.pageNumber, pageable.pageSize)
+            userUuid, pageable.pageNumber, pageable.pageSize)
 
-        val notificationPage = notificationService.getUserNotifications(userId, pageable)
+        val notificationPage = notificationService.getUserNotifications(userUuid, pageable)
         val pageResponse = PageResponse.from(notificationPage.map { NotificationResponse.from(it) })
 
         return ApiResponse.success(pageResponse)
@@ -74,13 +72,13 @@ class NotificationController(
     @Operation(summary = "읽지 않은 알림 수 조회", description = "사용자의 읽지 않은 알림 개수를 조회합니다.")
     @GetMapping("/unread-count")
     fun getUnreadCount(
-        @AuthenticationPrincipal jwt: Jwt
+        @RequestHeader("X-User-Id") userId: String
     ): ApiResponse<UnreadCountResponse> {
-        val userId = UUID.fromString(jwt.subject)
+        val userUuid = UUID.fromString(userId)
 
-        val unreadCount = notificationService.getUnreadNotificationCount(userId)
+        val unreadCount = notificationService.getUnreadNotificationCount(userUuid)
 
-        logger.debug("Unread notification count for user {}: {}", userId, unreadCount)
+        logger.debug("Unread notification count for user {}: {}", userUuid, unreadCount)
 
         return ApiResponse.success(UnreadCountResponse(unreadCount))
     }
@@ -89,13 +87,13 @@ class NotificationController(
     @PutMapping("/{notificationId}/read")
     fun markAsRead(
         @PathVariable notificationId: UUID,
-        @AuthenticationPrincipal jwt: Jwt
+        @RequestHeader("X-User-Id") userId: String
     ): ApiResponse<Unit> {
-        val userId = UUID.fromString(jwt.subject)
+        val userUuid = UUID.fromString(userId)
 
-        logger.info("Marking notification as read: notificationId={}, userId={}", notificationId, userId)
+        logger.info("Marking notification as read: notificationId={}, userId={}", notificationId, userUuid)
 
-        val success = notificationService.markNotificationAsRead(userId, notificationId)
+        val success = notificationService.markNotificationAsRead(userUuid, notificationId)
 
         return if (success) {
             ApiResponse.success(Unit)
@@ -107,13 +105,13 @@ class NotificationController(
     @Operation(summary = "알림 설정 조회", description = "사용자의 알림 설정을 조회합니다.")
     @GetMapping("/settings")
     fun getNotificationSettings(
-        @AuthenticationPrincipal jwt: Jwt
+        @RequestHeader("X-User-Id") userId: String
     ): ApiResponse<NotificationSettingsResponse> {
-        val userId = UUID.fromString(jwt.subject)
+        val userUuid = UUID.fromString(userId)
 
-        logger.debug("Getting notification settings for user: {}", userId)
+        logger.debug("Getting notification settings for user: {}", userUuid)
 
-        val settings = notificationService.getNotificationSettings(userId)
+        val settings = notificationService.getNotificationSettings(userUuid)
         val response = NotificationSettingsResponse.from(settings)
 
         return ApiResponse.success(response)
@@ -123,15 +121,15 @@ class NotificationController(
     @PutMapping("/settings")
     fun updateNotificationSettings(
         @Valid @RequestBody request: UpdateSettingsRequest,
-        @AuthenticationPrincipal jwt: Jwt
+        @RequestHeader("X-User-Id") userId: String
     ): ApiResponse<NotificationSettingsResponse> {
-        val userId = UUID.fromString(jwt.subject)
+        val userUuid = UUID.fromString(userId)
 
         logger.info("Updating notification settings for user: {}, reportEnabled: {}, systemEnabled: {}",
-            userId, request.reportEnabled, request.systemEnabled)
+            userUuid, request.reportEnabled, request.systemEnabled)
 
         val updatedSettings = notificationService.updateNotificationSettings(
-            userId = userId,
+            userId = userUuid,
             reportEnabled = request.reportEnabled,
             systemEnabled = request.systemEnabled
         )

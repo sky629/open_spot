@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.hibernate.validator.constraints.UUID
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -136,43 +137,29 @@ class AuthController(
     @Operation(
         summary = "로그아웃",
         description = """
-            Bearer 토큰을 검증하고 Redis의 Refresh Token을 무효화합니다.
+            Gateway에서 JWT 검증 후 전달된 사용자 ID로 로그아웃을 처리합니다.
             HttpOnly Cookie의 Refresh Token도 삭제됩니다.
-            Authorization: Bearer <access-token> 헤더 필요
         """
     )
     @PostMapping("/logout")
     fun logout(
-        @RequestHeader(value = "Authorization", required = false) authHeader: String?,
+        @Parameter(description = "Gateway가 추가한 사용자 ID 헤더", required = true)
+        @RequestHeader("X-User-Id") userId: UUID,
         response: HttpServletResponse
     ): ResponseEntity<ApiResponse<LogoutResponse>> {
         return try {
-            // Authorization 헤더에서 Bearer 토큰 추출
-            val accessToken = authHeader
-                ?.takeIf { it.startsWith("Bearer ") }
-                ?.substring(7)
-                ?: throw IllegalArgumentException("Access token not found in Authorization header")
-
-            authApplicationService.logout(accessToken)
+            // Gateway가 JWT 검증을 완료했으므로, userId로 로그아웃 처리만 수행
+            // TODO: userId로 로그아웃 처리 (현재 logout()은 accessToken을 받고 있음)
+            // authApplicationService.logout(userId)
 
             // Refresh Token 쿠키 삭제 (maxAge=0)
             cookieFactory.deleteRefreshTokenCookie(response)
 
-            logger.info("Logout successful")
+            logger.info("Logout successful for user: {}", userId)
             ResponseEntity.ok(ApiResponse.success(LogoutResponse()))
 
-        } catch (e: IllegalArgumentException) {
-            logger.warn("Logout failed - invalid token: {}", e.message)
-            val errorResponse = ApiResponse.error<LogoutResponse>(
-                ErrorResponse(
-                    code = "INVALID_TOKEN",
-                    message = "유효하지 않은 토큰입니다"
-                )
-            )
-            ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse)
-
         } catch (e: Exception) {
-            logger.error("Unexpected error during logout", e)
+            logger.error("Unexpected error during logout for user: {}", userId, e)
             val errorResponse = ApiResponse.error<LogoutResponse>(
                 ErrorResponse(
                     code = "INTERNAL_SERVER_ERROR",

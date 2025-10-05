@@ -1,26 +1,18 @@
 spring:
   cloud:
     gateway:
-      server:
-        webmvc:
-          routes:
-            - id: auth-service
-              uri: http://${AUTH_SERVICE_HOST:localhost}:${AUTH_SERVICE_PORT:8081}
-              predicates:
-                - Path=/api/v1/auth/**, /api/v1/users/**, /oauth2/**, /login/oauth2/**
-              filters:
-                - StripPrefix=0
-
-            - id: location-service
-              uri: http://${LOCATION_SERVICE_HOST:localhost}:${LOCATION_SERVICE_PORT:8082}
-              predicates:
-                - Path=/api/v1/stores/**, /api/v1/reports/**
-              filters:
-                - StripPrefix=0
+      # 라우트 설정을 GatewayRoutesConfig.kt에서 프로그래매틱하게 구성
+      # server.webmvc 설정은 제거 (프로그래매틱 라우트 사용)
       default-filters:
         - AddResponseHeader=X-Frame-Options, SAMEORIGIN
         - name: ForwardedHeaders
-            
+        - name: PreserveHostHeader
+
+jwt:
+  secret: ${JWT_SECRET:open-spot-jwt-secret-key-for-local-development-change-in-production}
+  access-token-expiration: 3600000    # Access Token: 1시간 (밀리초)
+  refresh-token-expiration: 604800000 # Refresh Token: 7일 (밀리초)
+
 server:
   port: 8080
 
@@ -29,3 +21,13 @@ management:
     web:
       exposure:
         include: health, info, gateway, refresh
+
+logging:
+  level:
+    root: DEBUG
+    org.springframework: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security.oauth2: DEBUG
+    com.kangpark.openspot: DEBUG
+    com.nimbusds: DEBUG

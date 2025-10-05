@@ -1,3 +1,6 @@
+# Development docker-compose: Infrastructure only
+# Use ./start-infrastructure.sh and ./start-services.sh for development
+# For production, use: docker-compose -f docker-compose.prod.yml up
 
 services:
   postgresql:

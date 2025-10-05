@@ -29,24 +29,25 @@ class UserController(
     
     /**
      * 현재 사용자 프로필 조회
+     * Gateway에서 전달한 X-User-Id 헤더로 프로필 정보를 조회합니다.
      */
     @Operation(
         summary = "현재 사용자 프로필 조회",
-        description = "JWT 토큰을 통해 현재 로그인한 사용자의 프로필 정보를 조회합니다."
+        description = "Gateway에서 전달한 X-User-Id 헤더를 통해 프로필 정보를 조회합니다."
     )
     @GetMapping("/self")
     fun getCurrentUser(
-        @Parameter(description = "Authorization 헤더의 Bearer 토큰")
-        @RequestHeader("Authorization") authorization: String
+        @Parameter(description = "사용자 ID (Gateway에서 자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<UserResponse>> {
         return try {
-            val accessToken = extractTokenFromAuthorizationHeader(authorization)
-            val user = authApplicationService.getCurrentUserProfile(accessToken)
+            val userUuid = UUID.fromString(userId)
+            val user = authApplicationService.getUserProfile(userUuid)
             val response = UserResponse.from(user)
-            
-            logger.info("Current user profile retrieved: {}", user.email)
+
+            logger.info("Current user profile retrieved: {} (ID: {})", user.email, userUuid)
             ResponseEntity.ok(ApiResponse.success(response))
-            
+
         } catch (e: GetUserProfileUseCase.UserProfileException) {
             logger.warn("User profile retrieval failed: {}", e.message)
             val errorResponse = ApiResponse.error<UserResponse>(
@@ -56,17 +57,7 @@ class UserController(
                 )
             )
             ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse)
-            
-        } catch (e: IllegalArgumentException) {
-            logger.warn("Invalid token for user profile: {}", e.message)
-            val errorResponse = ApiResponse.error<UserResponse>(
-                ErrorResponse(
-                    code = "INVALID_TOKEN",
-                    message = "유효하지 않은 토큰입니다"
-                )
-            )
-            ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse)
-            
+
         } catch (e: Exception) {
             logger.error("Unexpected error during user profile retrieval", e)
             val errorResponse = ApiResponse.error<UserResponse>(
@@ -118,15 +109,5 @@ class UserController(
             )
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse)
         }
-    }
-    
-    /**
-     * Authorization 헤더에서 토큰 추출
-     */
-    private fun extractTokenFromAuthorizationHeader(authorization: String): String {
-        if (!authorization.startsWith("Bearer ")) {
-            throw IllegalArgumentException("Invalid Authorization header format")
-        }
-        return authorization.substring(7)
     }
 }

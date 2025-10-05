@@ -11,11 +11,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Core Features
 - **개인 장소 기록**: 사용자가 원하는 위치에 평점과 정보를 기록하고 관리
-- **그룹 관리**: 방문한 장소들을 카테고리별로 그룹화하여 체계적으로 관리
+- **그룹 관리**: 방문한 장소들을 사용자 정의 그룹으로 분류하여 체계적으로 관리
 - **지도 기반 검색**: PostGIS 공간 쿼리로 내 주변 또는 특정 반경 내 기록된 장소 검색
-- **리뷰 및 메모**: 각 장소에 대한 상세한 리뷰, 사진, 방문 일자 등 기록
-- **방문 이력**: 언제, 어디를, 누구와 방문했는지 추적
-- **즐겨찾기**: 다시 방문하고 싶은 장소 북마크
+- **개인 평가**: 각 장소에 대한 평점, 리뷰, 태그 기록
+- **카테고리 분류**: 음식점, 카페, 관광지 등 사전 정의된 카테고리로 장소 분류
 - **소셜 공유 (예정)**: 친구들과 장소 그룹 및 추천 공유
 
 ### Technical Features
@@ -203,10 +202,21 @@ fun getLocations(pageable: Pageable): ApiResponse<PageResponse<LocationResponse>
 ```
 
 ### Security Configuration
-Each service has its own SecurityFilterChain to avoid conflicts:
-- **Auth Service**: OAuth2 login, JWT refresh, public health endpoints
-- **Location Service**: JWT authentication, public health and categories endpoints
-- **Gateway Service**: Routes requests, no authentication (delegates to services)
+**인증 방식**: Bearer Token (Access Token) + HttpOnly Cookie (Refresh Token)
+
+각 서비스의 SecurityFilterChain 설정:
+- **Auth Service**:
+  - OAuth2 login (Google)
+  - JWT 발급 (Access Token: Response Body, Refresh Token: HttpOnly Cookie)
+  - Public: health, login endpoints
+- **Gateway Service**:
+  - OAuth2 Resource Server (Bearer Token 검증)
+  - 검증 성공 시 X-User-Id 헤더 추가하여 내부 서비스로 전달
+  - 라우팅 및 중앙 인증
+- **Location Service**:
+  - Gateway 신뢰 (JWT 검증 없음)
+  - X-User-Id 헤더 기반 사용자 식별
+  - Public: health, categories endpoints
 - **Common Security**: Disabled by default to prevent FilterChain conflicts
 
 ## Key Implementation Patterns
@@ -217,17 +227,21 @@ Each service has its own SecurityFilterChain to avoid conflicts:
 class Location(
     val name: String,
     val description: String?,
-    val category: CategoryType,
+    val address: String?,
+    val categoryId: UUID,
     val coordinates: Coordinates,
+    val iconUrl: String?,
+    val personalRating: Int?,
+    val personalReview: String?,
+    val tags: List<String>,
+    val groupId: UUID?,
     val createdBy: UUID,
-    val averageRating: BigDecimal? = null,
-    val reviewCount: Long = 0,
     val isActive: Boolean = true
 ) : BaseEntity() {
 
-    fun updateRating(newAverageRating: BigDecimal?, newReviewCount: Long): Location {
-        require(newReviewCount >= 0) { "리뷰 수는 0 이상이어야 합니다" }
-        return Location(/* all fields with updates */)
+    fun updateEvaluation(rating: Int?, review: String?, tags: List<String>): Location {
+        require(rating == null || rating in 1..5) { "평점은 1-5 사이여야 합니다" }
+        return Location(/* all fields with updated evaluation */)
     }
 
     fun deactivate(): Location {
@@ -313,14 +327,10 @@ class LocationEventPublisher {
     fun publishLocationCreated(location: Location) {
         kafkaTemplate.send("location-events", LocationCreatedEvent(location))
     }
-
-    fun publishReviewCreated(review: Review) {
-        kafkaTemplate.send("review-events", ReviewCreatedEvent(review))
-    }
 }
 
 // Notification service consumes events
-@KafkaListener(topics = ["location-events", "review-events"])
+@KafkaListener(topics = ["location-events"])
 fun handleLocationEvent(event: LocationEvent)
 ```
 
@@ -328,9 +338,9 @@ fun handleLocationEvent(event: LocationEvent)
 
 ### Single Database with Service Separation
 - **Database**: `openspot` (PostgreSQL + PostGIS)
-- **Auth tables**: `users`, `refresh_tokens`
-- **Location tables**: `locations`, `reviews`, `location_visits`, `location_stats`
-- **Notification tables**: `notifications`
+- **Auth tables**: `users`, `social_accounts`
+- **Location tables**: `locations`, `categories`, `location_groups`
+- **Notification tables**: `notifications`, `device_tokens`, `notification_settings`
 
 ### Spatial Queries (PostGIS)
 ```sql
@@ -501,40 +511,40 @@ spring:
 
 ```bash
 # Auth Service (8081)
-GET  /api/v1/auth/google/login    # Google OAuth2 login
-GET  /api/v1/users/self           # Current user profile
-POST /api/v1/auth/token/refresh   # JWT token refresh
-POST /api/v1/auth/logout          # Logout
+GET  /api/v1/auth/google/login?redirect_uri=<url>  # Google OAuth2 login
+GET  /api/v1/users/self                           # Current user profile
+POST /api/v1/auth/token/refresh                   # JWT token refresh
+POST /api/v1/auth/logout                          # Logout
 
 # Location Service (8082)
-GET    /api/v1/categories         # Available location categories (public)
-POST   /api/v1/locations          # Create new location
-GET    /api/v1/locations/{id}     # Get location details (increments view count)
-PUT    /api/v1/locations/{id}     # Update location info
-DELETE /api/v1/locations/{id}     # Deactivate location
-GET    /api/v1/locations/search   # Search locations by various criteria
-GET    /api/v1/locations/popular  # Popular locations by views
-GET    /api/v1/users/self/locations  # User's created locations
+GET    /api/v1/categories                         # 카테고리 목록 (public)
+GET    /api/v1/locations                          # 장소 목록 조회 (검색/필터 지원)
+POST   /api/v1/locations                          # 새 장소 생성
+GET    /api/v1/locations/{id}                     # 장소 상세 조회
+PUT    /api/v1/locations/{id}                     # 장소 기본 정보 수정
+DELETE /api/v1/locations/{id}                     # 장소 비활성화
+PUT    /api/v1/locations/{id}/evaluation          # 개인 평가 정보 수정 (평점, 리뷰, 태그)
+PUT    /api/v1/locations/{id}/group               # 장소 그룹 변경
+PUT    /api/v1/locations/{id}/coordinates         # 장소 좌표 수정
+GET    /api/v1/locations/top-rated                # 최고 평점 장소 목록
+GET    /api/v1/locations/recent                   # 최근 등록 장소 목록
+GET    /api/v1/locations/self                     # 내 장소 목록
+GET    /api/v1/locations/groups/{groupId}         # 그룹별 장소 목록
 
-# Location Reviews
-POST   /api/v1/locations/{id}/reviews     # Create review for location
-GET    /api/v1/locations/{id}/reviews     # Get reviews for location
-GET    /api/v1/reviews/{id}               # Get specific review details
-PUT    /api/v1/reviews/{id}               # Update own review
-DELETE /api/v1/reviews/{id}               # Delete own review
-POST   /api/v1/reviews/{id}/helpful       # Mark review as helpful
-POST   /api/v1/reviews/{id}/report        # Report inappropriate review
-
-# Location Visits & Favorites
-POST   /api/v1/locations/{id}/visits            # Record location visit
-PUT    /api/v1/visits/{id}                      # Update visit details
-POST   /api/v1/locations/{id}/favorite/toggle   # Toggle favorite status
-GET    /api/v1/users/self/visits                # User's visit history
-GET    /api/v1/users/self/favorites             # User's favorite locations
+# Location Groups
+GET    /api/v1/locations/groups                   # 그룹 목록 조회
+POST   /api/v1/locations/groups                   # 그룹 생성
+PUT    /api/v1/locations/groups/{groupId}         # 그룹 수정
+DELETE /api/v1/locations/groups/{groupId}         # 그룹 삭제
+PUT    /api/v1/locations/groups/reorder           # 그룹 순서 변경
 
 # Notification Service (8083)
-GET    /api/v1/notifications        # Get user notifications
-PUT    /api/v1/notifications/{id}/read  # Mark notification as read
+POST   /api/v1/notifications/tokens               # 디바이스 토큰 등록
+GET    /api/v1/notifications                      # 알림 목록 조회
+GET    /api/v1/notifications/unread-count         # 읽지 않은 알림 수
+PUT    /api/v1/notifications/{id}/read            # 알림 읽음 처리
+GET    /api/v1/notifications/settings             # 알림 설정 조회
+PUT    /api/v1/notifications/settings             # 알림 설정 업데이트
 ```
 
 ### Swagger API Documentation

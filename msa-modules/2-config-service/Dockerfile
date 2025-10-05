@@ -9,7 +9,7 @@ COPY settings.gradle.kts .
 COPY build.gradle.kts .
 
 # Copy common modules first
-COPY msa-modules/0-common-core msa-modules/0-common-core
+COPY common-modules common-modules
 
 # Copy config service
 COPY msa-modules/2-config-service msa-modules/2-config-service

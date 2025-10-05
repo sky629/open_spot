@@ -8,6 +8,11 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.web.SecurityFilterChain
 
+/**
+ * Location Service Security 설정
+ * Gateway에서 JWT 인증을 완료하므로, 이 서비스는 Gateway를 신뢰합니다.
+ * Gateway가 전달하는 X-User-Id 헤더를 기반으로 사용자 식별
+ */
 @Configuration
 @EnableWebSecurity
 open class LocationSecurityConfig {
@@ -27,13 +32,9 @@ open class LocationSecurityConfig {
                         "/api/v1/locations/health",
                         "/api/v1/categories"
                     ).permitAll()
-                    // Protected endpoints - JWT authentication required
-                    .requestMatchers(
-                        "/api/v1/locations/**",
-                        "/api/v1/reviews/**"
-                    ).authenticated()
-                    // All other requests require authentication
-                    .anyRequest().authenticated()
+                    // Gateway가 JWT 검증을 완료했으므로 모든 요청 허용
+                    // X-User-Id 헤더를 통해 사용자 식별
+                    .anyRequest().permitAll()
             }
             .build()
     }

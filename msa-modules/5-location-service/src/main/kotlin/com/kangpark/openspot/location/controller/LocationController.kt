@@ -42,12 +42,13 @@ class LocationController(
     fun getLocations(
         @Parameter(description = "검색 조건")
         @ModelAttribute request: LocationSearchRequest,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID,
+        @Parameter(description = "사용자 ID (Gateway에서 자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
+        val userUuid = UUID.fromString(userId)
         // 조회 대상 사용자 (향후 친구 기능 확장용)
-        val targetUserId = request.targetUserId ?: userId
+        val targetUserId = request.targetUserId ?: userUuid
 
         val locationPage = when {
             // 1. 지도 영역(bounds) 검색 (우선순위 최상)
@@ -117,9 +118,10 @@ class LocationController(
     @PostMapping
     fun createLocation(
         @Valid @RequestBody request: CreateLocationRequest,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<LocationResponse>> {
+        val userUuid = UUID.fromString(userId)
         return try {
             val command = CreateLocationCommand(
                 name = request.name,
@@ -134,7 +136,7 @@ class LocationController(
                 groupId = request.groupId
             )
 
-            val (location, category) = locationApplicationService.createLocation(userId, command)
+            val (location, category) = locationApplicationService.createLocation(userUuid, command)
 
             val response = LocationResponse.from(location, category)
             ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response))
@@ -167,10 +169,11 @@ class LocationController(
     fun getLocation(
         @Parameter(description = "장소 ID", required = true)
         @PathVariable locationId: UUID,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<LocationResponse>> {
-        val result = locationApplicationService.getLocationById(locationId, userId)
+        val userUuid = UUID.fromString(userId)
+        val result = locationApplicationService.getLocationById(locationId, userUuid)
             ?: return ResponseEntity.notFound().build()
 
         val (location, category) = result
@@ -184,9 +187,10 @@ class LocationController(
         @Parameter(description = "장소 ID", required = true)
         @PathVariable locationId: UUID,
         @Valid @RequestBody request: UpdateLocationRequest,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<LocationResponse>> {
+        val userUuid = UUID.fromString(userId)
         return try {
             val command = UpdateLocationCommand(
                 name = request.name,
@@ -196,7 +200,7 @@ class LocationController(
                 iconUrl = request.iconUrl
             )
 
-            val (location, category) = locationApplicationService.updateLocation(locationId, userId, command)
+            val (location, category) = locationApplicationService.updateLocation(locationId, userUuid, command)
 
             val response = LocationResponse.from(location, category)
             ResponseEntity.ok(ApiResponse.success(response))
@@ -230,9 +234,10 @@ class LocationController(
         @Parameter(description = "장소 ID", required = true)
         @PathVariable locationId: UUID,
         @Valid @RequestBody request: UpdateLocationEvaluationRequest,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<LocationResponse>> {
+        val userUuid = UUID.fromString(userId)
         return try {
             val command = UpdateLocationEvaluationCommand(
                 personalRating = request.personalRating,
@@ -240,7 +245,7 @@ class LocationController(
                 tags = request.tags
             )
 
-            val (location, category) = locationApplicationService.updateLocationEvaluation(locationId, userId, command)
+            val (location, category) = locationApplicationService.updateLocationEvaluation(locationId, userUuid, command)
 
             val response = LocationResponse.from(location, category)
             ResponseEntity.ok(ApiResponse.success(response))
@@ -274,13 +279,14 @@ class LocationController(
         @Parameter(description = "장소 ID", required = true)
         @PathVariable locationId: UUID,
         @Valid @RequestBody request: ChangeLocationGroupRequest,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<LocationResponse>> {
+        val userUuid = UUID.fromString(userId)
         return try {
             val (location, category) = locationApplicationService.changeLocationGroup(
                 locationId = locationId,
-                userId = userId,
+                userId = userUuid,
                 groupId = request.groupId
             )
 
@@ -316,13 +322,14 @@ class LocationController(
         @Parameter(description = "장소 ID", required = true)
         @PathVariable locationId: UUID,
         @Valid @RequestBody request: UpdateLocationCoordinatesRequest,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<LocationResponse>> {
+        val userUuid = UUID.fromString(userId)
         return try {
             val (location, category) = locationApplicationService.updateLocationCoordinates(
                 locationId = locationId,
-                userId = userId,
+                userId = userUuid,
                 coordinates = request.toCoordinates()
             )
 
@@ -357,11 +364,12 @@ class LocationController(
     fun deactivateLocation(
         @Parameter(description = "장소 ID", required = true)
         @PathVariable locationId: UUID,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<Map<String, Any>>> {
+        val userUuid = UUID.fromString(userId)
         return try {
-            locationApplicationService.deactivateLocation(locationId, userId)
+            locationApplicationService.deactivateLocation(locationId, userUuid)
 
             val response = mapOf(
                 "locationId" to locationId,
@@ -396,11 +404,12 @@ class LocationController(
     @Operation(summary = "최고 평점 장소 목록", description = "내 개인 평점 기준 최고 평점 장소 목록을 조회합니다.")
     @GetMapping("/top-rated")
     fun getTopRatedLocations(
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID,
+        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val locationPage = locationApplicationService.getTopRatedLocations(userId, pageable)
+        val userUuid = UUID.fromString(userId)
+        val locationPage = locationApplicationService.getTopRatedLocations(userUuid, pageable)
         val responseList = locationPage.content.map { (location, category) ->
             LocationSummaryResponse.from(location, category)
         }
@@ -421,11 +430,12 @@ class LocationController(
     @Operation(summary = "최근 등록 장소 목록", description = "최근 등록한 내 장소 목록을 조회합니다.")
     @GetMapping("/recent")
     fun getRecentLocations(
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID,
+        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val locationPage = locationApplicationService.getRecentLocations(userId, pageable)
+        val userUuid = UUID.fromString(userId)
+        val locationPage = locationApplicationService.getRecentLocations(userUuid, pageable)
         val responseList = locationPage.content.map { (location, category) ->
             LocationSummaryResponse.from(location, category)
         }
@@ -446,11 +456,12 @@ class LocationController(
     @Operation(summary = "내 장소 목록", description = "내가 생성한 모든 장소 목록을 조회합니다.")
     @GetMapping("/self")
     fun getMyLocations(
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID,
+        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val locationPage = locationApplicationService.getLocationsByUser(userId, pageable)
+        val userUuid = UUID.fromString(userId)
+        val locationPage = locationApplicationService.getLocationsByUser(userUuid, pageable)
         val responseList = locationPage.content.map { (location, category) ->
             LocationSummaryResponse.from(location, category)
         }
@@ -473,11 +484,12 @@ class LocationController(
     fun getLocationsByGroup(
         @Parameter(description = "그룹 ID (null이면 그룹 미지정 장소)")
         @PathVariable(required = false) groupId: UUID?,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID,
+        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String,
         @PageableDefault(size = 20) pageable: Pageable
     ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val locationPage = locationApplicationService.getLocationsByUserAndGroup(userId, groupId, pageable)
+        val userUuid = UUID.fromString(userId)
+        val locationPage = locationApplicationService.getLocationsByUserAndGroup(userUuid, groupId, pageable)
         val responseList = locationPage.content.map { (location, category) ->
             LocationSummaryResponse.from(location, category)
         }

@@ -13,19 +13,27 @@ info:
     ## 인증 방식
     - **Access Token**: Authorization 헤더로 전달 (Bearer 방식)
     - **Refresh Token**: HttpOnly Cookie로 전달 (XSS 방어)
+
+    ## MSA 아키텍처
+    - **Gateway (8080)**: 모든 API의 진입점, JWT 검증 수행
+    - **Auth Service (8081)**: Google OAuth2 로그인, JWT 발급
+    - **Location Service (8082)**: 장소 관리
+    - **Notification Service (8083)**: 알림 관리
+
+    **중요**: 프론트엔드는 반드시 Gateway(8080)를 통해 API를 호출해야 합니다.
   version: 1.0.0
   contact:
     name: Open-Spot Team
 
 servers:
   - url: http://localhost:8080
-    description: Local Development Gateway
+    description: Gateway (모든 API 호출은 이 URL 사용)
   - url: http://localhost:8081
-    description: Auth Service (Direct)
+    description: Auth Service (직접 호출 금지, Gateway 경유 필수)
   - url: http://localhost:8082
-    description: Location Service (Direct)
+    description: Location Service (직접 호출 금지, Gateway 경유 필수)
   - url: http://localhost:8083
-    description: Notification Service (Direct)
+    description: Notification Service (직접 호출 금지, Gateway 경유 필수)
 
 tags:
   - name: Authentication
@@ -191,7 +199,13 @@ paths:
       tags:
         - Users
       summary: 현재 사용자 프로필 조회
-      description: JWT 토큰을 통해 현재 로그인한 사용자의 프로필을 조회합니다.
+      description: |
+        Gateway에서 검증된 JWT의 사용자 ID로 프로필을 조회합니다.
+
+        **인증 플로우**:
+        1. 클라이언트 → Gateway: `Authorization: Bearer <token>`
+        2. Gateway: JWT 검증 후 X-User-Id 헤더 추가
+        3. Auth Service: X-User-Id 헤더로 사용자 식별
       operationId: getCurrentUser
       responses:
         '200':
@@ -213,7 +227,7 @@ paths:
       tags:
         - Users
       summary: 사용자 프로필 조회
-      description: 특정 사용자 ID로 프로필을 조회합니다.
+      description: 특정 사용자 ID로 프로필을 조회합니다. (관리자 또는 친구 기능용)
       operationId: getUserById
       parameters:
         - $ref: '#/components/parameters/UserIdParam'
@@ -897,6 +911,12 @@ components:
         **토큰 획득**:
         1. Google 로그인 성공 시 URL 쿼리 파라미터로 전달
         2. 토큰 갱신 API 응답 본문에서 획득
+
+        **인증 플로우 (MSA 표준)**:
+        1. 클라이언트 → Gateway: `Authorization: Bearer <token>` 헤더 포함
+        2. Gateway: JWT 검증 (HS256 알고리즘)
+        3. Gateway: 검증 성공 시 `X-User-Id` 헤더 추가
+        4. 내부 서비스: `X-User-Id` 헤더로 사용자 식별 (JWT 검증 불필요)
 
   parameters:
     UserIdParam:

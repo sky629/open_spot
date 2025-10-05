@@ -55,7 +55,7 @@ spring:
             user-name-attribute: sub
             
 jwt:
-  secret: ${JWT_SECRET:openspot-jwt-secret-key-for-development-only}
+  secret: ${JWT_SECRET:open-spot-jwt-secret-key-for-local-development-change-in-production}
   access-token-expiration: 3600000    # Access Token: 1시간 (밀리초)
   refresh-token-expiration: 604800000 # Refresh Token: 7일 (밀리초)
 
@@ -99,3 +99,13 @@ resilience4j:
         failure-rate-threshold: 50
         wait-duration-in-open-state: 30s
         sliding-window-size: 10
+
+logging:
+  level:
+    root: DEBUG
+    org.springframework: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security.oauth2: DEBUG
+    com.kangpark.openspot: DEBUG
+    com.nimbusds: DEBUG

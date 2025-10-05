@@ -29,12 +29,13 @@ class LocationGroupController(
     @PostMapping
     fun createGroup(
         @Valid @RequestBody request: CreateLocationGroupRequest,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "사용자 ID (Gateway에서 자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<LocationGroupResponse>> {
+        val userUuid = UUID.fromString(userId)
         return try {
             val locationGroup = createLocationGroupUseCase.execute(
-                userId = userId,
+                userId = userUuid,
                 name = request.name,
                 description = request.description,
                 color = request.color,
@@ -70,11 +71,12 @@ class LocationGroupController(
     @Operation(summary = "그룹 목록 조회", description = "사용자의 모든 그룹 목록을 조회합니다 (order 순서대로).")
     @GetMapping
     fun getGroups(
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "사용자 ID (Gateway에서 자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<List<LocationGroupResponse>>> {
+        val userUuid = UUID.fromString(userId)
         return try {
-            val groups = getLocationGroupsUseCase.execute(userId)
+            val groups = getLocationGroupsUseCase.execute(userUuid)
             val responses = groups.map { LocationGroupResponse.from(it) }
             ResponseEntity.ok(ApiResponse.success(responses))
 
@@ -97,13 +99,14 @@ class LocationGroupController(
         @Parameter(description = "그룹 ID", required = true)
         @PathVariable groupId: UUID,
         @Valid @RequestBody request: UpdateLocationGroupRequest,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "사용자 ID (Gateway에서 자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<LocationGroupResponse>> {
+        val userUuid = UUID.fromString(userId)
         return try {
             val locationGroup = updateLocationGroupUseCase.execute(
                 groupId = groupId,
-                userId = userId,
+                userId = userUuid,
                 name = request.name,
                 description = request.description,
                 color = request.color,
@@ -140,12 +143,13 @@ class LocationGroupController(
     @PutMapping("/reorder")
     fun reorderGroups(
         @Valid @RequestBody request: ReorderLocationGroupsRequest,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "사용자 ID (Gateway에서 자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<List<LocationGroupResponse>>> {
+        val userUuid = UUID.fromString(userId)
         return try {
             val groupIdOrders = request.groupOrders.associate { it.groupId to it.order }
-            val reorderedGroups = reorderLocationGroupsUseCase.execute(userId, groupIdOrders)
+            val reorderedGroups = reorderLocationGroupsUseCase.execute(userUuid, groupIdOrders)
             val responses = reorderedGroups.map { LocationGroupResponse.from(it) }
             ResponseEntity.ok(ApiResponse.success(responses))
 
@@ -177,11 +181,12 @@ class LocationGroupController(
     fun deleteGroup(
         @Parameter(description = "그룹 ID", required = true)
         @PathVariable groupId: UUID,
-        @Parameter(description = "사용자 ID", required = true)
-        @RequestHeader("X-User-Id") userId: UUID
+        @Parameter(description = "사용자 ID (Gateway에서 자동 주입)", hidden = true)
+        @RequestHeader("X-User-Id") userId: String
     ): ResponseEntity<ApiResponse<Map<String, Any>>> {
+        val userUuid = UUID.fromString(userId)
         return try {
-            deleteLocationGroupUseCase.execute(groupId, userId)
+            deleteLocationGroupUseCase.execute(groupId, userUuid)
 
             val response = mapOf(
                 "groupId" to groupId,
