@@ -6,7 +6,6 @@ import com.kangpark.openspot.common.web.dto.PageResponse
 import com.kangpark.openspot.notification.controller.dto.*
 import com.kangpark.openspot.notification.service.NotificationService
 import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory

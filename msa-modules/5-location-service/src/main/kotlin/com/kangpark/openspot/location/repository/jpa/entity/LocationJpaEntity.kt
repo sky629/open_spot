@@ -65,11 +65,11 @@ class LocationJpaEntity(
     val iconUrl: String? = null,
 
     // 개인 평가 정보
-    @Column(name = "personal_rating")
-    val personalRating: Int? = null,
+    @Column(name = "rating", columnDefinition = "NUMERIC(2,1)")
+    val rating: Double? = null,
 
-    @Column(name = "personal_review", length = 2000)
-    val personalReview: String? = null,
+    @Column(name = "review", length = 2000)
+    val review: String? = null,
 
     @Column(name = "tags", columnDefinition = "text[]")
     @JdbcTypeCode(SqlTypes.ARRAY)
@@ -106,8 +106,8 @@ class LocationJpaEntity(
             categoryId = categoryId,
             coordinates = Coordinates.of(latitude, longitude),
             iconUrl = iconUrl,
-            personalRating = personalRating,
-            personalReview = personalReview,
+            rating = rating,
+            review = review,
             tags = tags.toList(),
             isFavorite = isFavorite,
             groupId = groupId,
@@ -135,8 +135,8 @@ class LocationJpaEntity(
                 latitude = location.coordinates.latitude.toDouble(),
                 longitude = location.coordinates.longitude.toDouble(),
                 iconUrl = location.iconUrl,
-                personalRating = location.personalRating,
-                personalReview = location.personalReview,
+                rating = location.rating,
+                review = location.review,
                 tags = location.tags.toTypedArray(),
                 isFavorite = location.isFavorite,
                 groupId = location.groupId,

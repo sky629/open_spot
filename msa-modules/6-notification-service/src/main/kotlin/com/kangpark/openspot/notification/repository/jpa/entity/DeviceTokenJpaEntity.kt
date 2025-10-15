@@ -1,9 +1,10 @@
-package com.kangpark.openspot.notification.domain
+package com.kangpark.openspot.notification.repository.jpa.entity
 
+import com.kangpark.openspot.common.core.domain.BaseEntity
+import com.kangpark.openspot.notification.domain.entity.DeviceToken
 import com.kangpark.openspot.notification.domain.vo.DeviceType
 import jakarta.persistence.*
 import org.hibernate.annotations.JdbcTypeCode
-import org.hibernate.annotations.UuidGenerator
 import org.hibernate.type.SqlTypes
 import org.springframework.data.annotation.CreatedDate
 import org.springframework.data.annotation.LastModifiedDate
@@ -18,26 +19,22 @@ import java.util.*
     indexes = [
         Index(name = "idx_device_tokens_user_id", columnList = "user_id"),
         Index(name = "idx_device_tokens_token", columnList = "token"),
-        Index(name = "idx_device_tokens_active", columnList = "user_id, is_active"),
-        Index(name = "idx_device_tokens_device_type", columnList = "device_type")
+        Index(name = "idx_device_tokens_active", columnList = "user_id, is_active")
     ],
-    uniqueConstraints = [
-        UniqueConstraint(name = "uk_device_tokens_token", columnNames = ["token"])
-    ]
+    uniqueConstraints = [UniqueConstraint(name = "uk_device_tokens_token", columnNames = ["token"])]
 )
 @EntityListeners(AuditingEntityListener::class)
-class DeviceToken(
+class DeviceTokenJpaEntity(
     @Id
-    @UuidGenerator(style = UuidGenerator.Style.TIME)
     @JdbcTypeCode(SqlTypes.UUID)
     @Column(name = "id", nullable = false, updatable = false, columnDefinition = "uuid")
-    val id: UUID? = null,
+    val id: UUID,
 
     @Column(name = "user_id", nullable = false)
     val userId: UUID,
 
     @Column(name = "token", nullable = false, length = 500)
-    var token: String,
+    val token: String,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "device_type", nullable = false, length = 20)
@@ -47,10 +44,10 @@ class DeviceToken(
     val deviceId: String? = null,
 
     @Column(name = "is_active", nullable = false)
-    var isActive: Boolean = true,
+    val isActive: Boolean = true,
 
     @Column(name = "last_used_at")
-    var lastUsedAt: LocalDateTime? = null,
+    val lastUsedAt: LocalDateTime? = null,
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -60,30 +57,35 @@ class DeviceToken(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
-
-    fun markAsUsed() {
-        lastUsedAt = LocalDateTime.now()
+    fun toDomain(): DeviceToken {
+        return DeviceToken(
+            userId = userId,
+            token = token,
+            deviceType = deviceType,
+            deviceId = deviceId,
+            isActive = isActive,
+            lastUsedAt = lastUsedAt,
+            baseEntity = BaseEntity(
+                id = this.id,
+                createdAt = this.createdAt,
+                updatedAt = this.updatedAt
+            )
+        )
     }
 
-    fun deactivate() {
-        isActive = false
-    }
-
-    fun activate() {
-        isActive = true
-    }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is DeviceToken) return false
-        return id == other.id
-    }
-
-    override fun hashCode(): Int {
-        return id?.hashCode() ?: 0
-    }
-
-    override fun toString(): String {
-        return "DeviceToken(id=$id, userId=$userId, deviceType=$deviceType, isActive=$isActive)"
+    companion object {
+        fun fromDomain(token: DeviceToken): DeviceTokenJpaEntity {
+            return DeviceTokenJpaEntity(
+                id = token.id,
+                userId = token.userId,
+                token = token.token,
+                deviceType = token.deviceType,
+                deviceId = token.deviceId,
+                isActive = token.isActive,
+                lastUsedAt = token.lastUsedAt,
+                createdAt = token.createdAt,
+                updatedAt = token.updatedAt
+            )
+        }
     }
 }

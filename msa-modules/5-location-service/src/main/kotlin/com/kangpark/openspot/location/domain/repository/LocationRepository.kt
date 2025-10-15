@@ -27,7 +27,7 @@ interface LocationRepository {
     fun deleteById(id: UUID)
 
     /**
-     * 특정 반경 내의 장소 검색 (사용자별, 카테고리 필터 선택)
+     * 특정 반경 내의 장소 검색 (사용자별, 카테고리/그룹 필터 선택)
      */
     fun findByCoordinatesWithinRadius(
         userId: UUID,
@@ -35,11 +35,12 @@ interface LocationRepository {
         longitude: Double,
         radiusMeters: Double,
         categoryId: UUID? = null,
+        groupId: UUID? = null,
         pageable: Pageable
     ): Page<Location>
 
     /**
-     * 지도 영역(bounds) 내의 장소 검색 (사용자별, 카테고리 필터 선택)
+     * 지도 영역(bounds) 내의 장소 검색 (사용자별, 카테고리/그룹 필터 선택)
      */
     fun findByCoordinatesWithinBounds(
         userId: UUID,
@@ -48,6 +49,7 @@ interface LocationRepository {
         southWestLat: Double,
         southWestLon: Double,
         categoryId: UUID? = null,
+        groupId: UUID? = null,
         pageable: Pageable
     ): Page<Location>
 

@@ -45,7 +45,8 @@ class LocationApplicationService(
     }
 
     /**
-     * 장소 기본 정보 수정
+     * 장소 정보 통합 수정 (부분 업데이트)
+     * 제공된 필드만 업데이트됨
      */
     fun updateLocation(
         locationId: UUID,
@@ -53,50 +54,8 @@ class LocationApplicationService(
         command: UpdateLocationCommand
     ): Pair<Location, Category> {
         val location = updateLocationUseCase.execute(locationId, userId, command)
-        val category = categoryRepository.findById(command.categoryId)
+        val category = categoryRepository.findById(location.categoryId)
             ?: throw IllegalStateException("Category not found after location update")
-        return Pair(location, category)
-    }
-
-    /**
-     * 개인 평가 정보 수정
-     */
-    fun updateLocationEvaluation(
-        locationId: UUID,
-        userId: UUID,
-        command: UpdateLocationEvaluationCommand
-    ): Pair<Location, Category> {
-        val location = updateLocationUseCase.updatePersonalEvaluation(locationId, userId, command)
-        val category = categoryRepository.findById(location.categoryId)
-            ?: throw IllegalStateException("Category not found")
-        return Pair(location, category)
-    }
-
-    /**
-     * 장소 그룹 변경
-     */
-    fun changeLocationGroup(
-        locationId: UUID,
-        userId: UUID,
-        groupId: UUID?
-    ): Pair<Location, Category> {
-        val location = updateLocationUseCase.changeGroup(locationId, userId, groupId)
-        val category = categoryRepository.findById(location.categoryId)
-            ?: throw IllegalStateException("Category not found")
-        return Pair(location, category)
-    }
-
-    /**
-     * 장소 좌표 수정
-     */
-    fun updateLocationCoordinates(
-        locationId: UUID,
-        userId: UUID,
-        coordinates: Coordinates
-    ): Pair<Location, Category> {
-        val location = updateLocationUseCase.updateCoordinates(locationId, userId, coordinates)
-        val category = categoryRepository.findById(location.categoryId)
-            ?: throw IllegalStateException("Category not found")
         return Pair(location, category)
     }
 
@@ -118,10 +77,11 @@ class LocationApplicationService(
         longitude: Double,
         radiusMeters: Double,
         categoryId: UUID? = null,
+        groupId: UUID? = null,
         pageable: Pageable
     ): Page<Pair<Location, Category>> {
         val locationPage = searchLocationUseCase.searchByRadius(
-            userId, latitude, longitude, radiusMeters, categoryId, pageable
+            userId, latitude, longitude, radiusMeters, categoryId, groupId, pageable
         )
         return mapLocationsWithCategories(locationPage)
     }
@@ -136,10 +96,11 @@ class LocationApplicationService(
         southWestLat: Double,
         southWestLon: Double,
         categoryId: UUID? = null,
+        groupId: UUID? = null,
         pageable: Pageable
     ): Page<Pair<Location, Category>> {
         val locationPage = searchLocationUseCase.searchByBounds(
-            userId, northEastLat, northEastLon, southWestLat, southWestLon, categoryId, pageable
+            userId, northEastLat, northEastLon, southWestLat, southWestLon, categoryId, groupId, pageable
         )
         return mapLocationsWithCategories(locationPage)
     }

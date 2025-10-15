@@ -34,36 +34,59 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **notification-service** (8083): Kafka consumer for async notifications
 
 ### Common Modules (Shared Libraries)
-- **common-core**: BaseEntity, exceptions, utilities (no Spring Web)
-- **common-web**: ApiResponse, GlobalExceptionHandler, security configs
+- **common-core** (0-common-core): BaseEntity, exceptions, utilities (no Spring Web)
+- **common-web** (1-common-web): ApiResponse, GlobalExceptionHandler, security configs
+
+**Module Naming Convention**: Services are prefixed with numbers (0-6) to indicate dependency order and startup sequence.
 
 ### Infrastructure Stack
-- **Build**: Gradle multi-module, Java 21, Kotlin 1.9.25
-- **Data**: PostgreSQL 15.4 + PostGIS, Redis, Kafka
+- **Build**: Gradle 8.11.1 multi-module, Java 21, Kotlin 1.9.25
+- **Data**: PostgreSQL 15.4 + PostGIS, Redis 7.2, Kafka 7.4
 - **Migration**: Flyway 10.0.0 (PostgreSQL 15.4 compatibility)
 - **Container**: Docker Compose for local development
+- **API Documentation**: OpenAPI 3.1.1 specification (`openapi.yaml`) for TypeScript client generation
 
 ## Development Commands
+
+### Environment Setup
+```bash
+# 1. Copy environment template
+cp .env.example .env
+
+# 2. Edit .env with your credentials
+# Required variables:
+# - GOOGLE_CLIENT_ID: Google OAuth2 client ID
+# - GOOGLE_CLIENT_SECRET: Google OAuth2 client secret
+# - JWT_SECRET: Secret key for JWT signing
+```
 
 ### Quick Start
 ```bash
 # Start infrastructure + config + gateway
 ./start-infrastructure.sh
 
-# Start domain services  
+# Start domain services
 ./start-services.sh
 
 # Stop everything
 ./stop-all.sh
+
+# View service logs
+tail -f logs/config-service.log
+tail -f logs/gateway-service.log
+tail -f logs/auth-service.log
+tail -f logs/location-service.log
+tail -f logs/notification-service.log
 ```
 
 ### Individual Service Development
 ```bash
-# Run individual services
+# Run individual services (module names without number prefixes)
 ./gradlew :config-service:bootRun
 ./gradlew :gateway-service:bootRun
 ./gradlew :auth-service:bootRun
 ./gradlew :location-service:bootRun
+./gradlew :notification-service:bootRun
 
 # Test by service and layer (TDD approach)
 ./gradlew :auth-service:test                    # Full service test
@@ -75,9 +98,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Continuous TDD development
 ./gradlew :location-service:test --tests="LocationTest" --continuous
 
-# Build and test all services
-./gradlew build
-./gradlew test
+# Build and test
+./gradlew build                  # Build all modules
+./gradlew test                   # Test all modules
+./gradlew clean build            # Clean build
+./gradlew :location-service:build  # Build specific service
 ```
 
 ### Health Check Endpoints
@@ -93,9 +118,9 @@ curl http://localhost:8083/api/v1/notifications/health # Notification service
 curl http://localhost:9999/actuator/health           # Config service
 ```
 
-### Swagger UI Access
+### API Documentation
 ```bash
-# API Documentation (Swagger UI)
+# Swagger UI (각 서비스별 한국어 문서)
 http://localhost:8081/swagger-ui.html    # Auth service API docs
 http://localhost:8082/swagger-ui.html    # Location service API docs
 http://localhost:8083/swagger-ui.html    # Notification service API docs
@@ -104,9 +129,33 @@ http://localhost:8083/swagger-ui.html    # Notification service API docs
 http://localhost:8080/auth/swagger-ui.html
 http://localhost:8080/locations/swagger-ui.html
 http://localhost:8080/notifications/swagger-ui.html
+
+# OpenAPI 3.1.1 Specification (프론트엔드 TypeScript 클라이언트 생성용)
+# File: openapi.yaml
+# 사용법:
+# - openapi-generator-cli를 사용하여 TypeScript/React Query 클라이언트 생성
+# - 모든 API는 Gateway(8080)를 통해 호출해야 함
+# - Bearer Token 인증 방식 사용 (Authorization: Bearer <token>)
 ```
 
 ## Architecture Patterns
+
+### Gradle Module Structure
+```
+open_spot/
+├── settings.gradle.kts          # Module declarations (without number prefixes)
+├── build.gradle.kts            # Root build configuration
+└── msa-modules/
+    ├── 0-common-core/          # project(":common-core")
+    ├── 1-common-web/           # project(":common-web")
+    ├── 2-config-service/       # project(":config-service")
+    ├── 3-gateway-service/      # project(":gateway-service")
+    ├── 4-auth-service/         # project(":auth-service")
+    ├── 5-location-service/     # project(":location-service")
+    └── 6-notification-service/ # project(":notification-service")
+```
+
+**Important**: When referencing modules in Gradle commands, use the project name without the number prefix (e.g., `:auth-service`, not `:4-auth-service`).
 
 ### Clean Architecture (Per Service)
 ```
@@ -116,11 +165,13 @@ http://localhost:8080/notifications/swagger-ui.html
 ├── service/                    # Application Layer (Use Cases, orchestration)
 │   └── usecase/
 ├── repository/                 # Infrastructure Layer (JPA implementations)
-│   └── entity/                 # JPA entities with database mappings
+│   ├── jpa/                    # JPA repositories (Spring Data JPA)
+│   │   └── entity/            # JPA entities with database mappings
+│   └── impl/                   # Domain repository implementations
 └── domain/                     # Domain Layer (pure business logic)
     ├── entity/                 # Pure domain entities (no JPA annotations)
     ├── repository/             # Domain repository interfaces
-    └── vo/            # Value objects and enums
+    └── vo/                     # Value objects and enums
 ```
 
 ### Dependency Flow
@@ -134,30 +185,66 @@ Presentation → Application → Domain ← Infrastructure
 
 ### Entity Architecture Pattern (Domain/JPA Separation)
 ```kotlin
-// Domain Entity (pure business logic)
-class Location(
+// Domain Entity (pure business logic) - BaseEntity 합성 패턴
+data class Location(
+    val userId: UUID,
     val name: String,
-    val description: String?,
-    val category: CategoryType,
+    val description: String? = null,
+    val categoryId: UUID,
     val coordinates: Coordinates,
-    val createdBy: UUID
-) : BaseEntity() {
-    fun updateRating(newRating: BigDecimal?): Location {
-        return Location(/* updated fields */)
+    val rating: Double? = null,              // 0.5-5.0 개인 평점
+    val review: String? = null,
+    val tags: List<String> = emptyList(),
+    val groupId: UUID? = null,
+    val isActive: Boolean = true,
+    val baseEntity: BaseEntity = BaseEntity()  // 합성 (상속 대신)
+) {
+    // 편의 프로퍼티로 BaseEntity 필드 접근
+    val id: UUID get() = baseEntity.id
+    val createdAt: LocalDateTime get() = baseEntity.createdAt
+    val updatedAt: LocalDateTime get() = baseEntity.updatedAt
+
+    fun updateEvaluation(rating: Double?, review: String?, tags: List<String>): Location {
+        require(rating == null || (rating >= 0.5 && rating <= 5.0)) { "평점은 0.5-5.0 사이여야 합니다" }
+        return copy(
+            rating = rating,
+            review = review,
+            tags = tags,
+            baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now())
+        )
+    }
+
+    companion object {
+        fun create(userId: UUID, name: String, /* ... */): Location {
+            // 팩토리 메서드로 생성
+        }
     }
 }
 
 // JPA Entity (database mapping)
 @Entity
 @Table(name = "locations", schema = "location")
-class LocationJpaEntity(
+data class LocationJpaEntity(
     @Id @UuidGenerator val id: UUID? = null,
-    @Column(name = "name") val name: String,
+    @Column(name = "user_id", nullable = false) val userId: UUID,
+    @Column(name = "name", nullable = false, length = 100) val name: String,
     // ... JPA annotations and mappings
 ) {
-    fun toDomain(): Location { /* conversion logic */ }
+    fun toDomain(): Location {
+        return Location(/* conversion */).copy(
+            baseEntity = BaseEntity(id = this.id!!, createdAt = this.createdAt, updatedAt = this.updatedAt)
+        )
+    }
+
     companion object {
-        fun fromDomain(location: Location): LocationJpaEntity { /* conversion logic */ }
+        fun fromDomain(location: Location): LocationJpaEntity {
+            return LocationJpaEntity(
+                id = location.id,
+                userId = location.userId,
+                name = location.name,
+                // ...
+            )
+        }
     }
 }
 ```
@@ -186,9 +273,16 @@ class LocationRepositoryImpl(
 
 ### Common Module Usage
 ```kotlin
-// All domain entities extend BaseEntity (common-core)
-class User : BaseEntity() {
-    // Automatically includes id: UUID, createdAt: LocalDateTime, updatedAt: LocalDateTime
+// Domain entities use BaseEntity via composition (common-core)
+data class User(
+    val email: String,
+    val name: String,
+    val baseEntity: BaseEntity = BaseEntity()  // 합성 패턴
+) {
+    // 편의 프로퍼티로 BaseEntity 필드 접근
+    val id: UUID get() = baseEntity.id
+    val createdAt: LocalDateTime get() = baseEntity.createdAt
+    val updatedAt: LocalDateTime get() = baseEntity.updatedAt
 }
 
 // Consistent API responses (common-web)
@@ -198,7 +292,10 @@ fun getUser(@PathVariable id: String): ApiResponse<UserResponse> {
 }
 
 // Paginated responses (common-web)
-fun getLocations(pageable: Pageable): ApiResponse<PageResponse<LocationResponse>>
+@GetMapping("/api/v1/locations")
+fun getLocations(pageable: Pageable): ApiResponse<PageResponse<LocationResponse>> {
+    return ApiResponse.success(locationService.getLocations(pageable))
+}
 ```
 
 ### Security Configuration
@@ -223,58 +320,129 @@ fun getLocations(pageable: Pageable): ApiResponse<PageResponse<LocationResponse>
 
 ### Domain-Driven Design with Clean Architecture
 ```kotlin
-// 1. Pure Domain Entity (no external dependencies)
-class Location(
+// 1. Pure Domain Entity (no external dependencies) - BaseEntity 합성 패턴
+data class Location(
+    val userId: UUID,                        // 소유자
     val name: String,
-    val description: String?,
-    val address: String?,
+    val description: String? = null,
+    val address: String? = null,
     val categoryId: UUID,
     val coordinates: Coordinates,
-    val iconUrl: String?,
-    val personalRating: Int?,
-    val personalReview: String?,
-    val tags: List<String>,
-    val groupId: UUID?,
-    val createdBy: UUID,
-    val isActive: Boolean = true
-) : BaseEntity() {
+    val iconUrl: String? = null,
 
-    fun updateEvaluation(rating: Int?, review: String?, tags: List<String>): Location {
-        require(rating == null || rating in 1..5) { "평점은 1-5 사이여야 합니다" }
-        return Location(/* all fields with updated evaluation */)
+    // 개인 평가 정보
+    val rating: Double? = null,              // 0.5-5.0 개인 평점 (0.5 단위)
+    val review: String? = null,
+    val tags: List<String> = emptyList(),
+    val isFavorite: Boolean = false,         // 즐겨찾기 여부
+
+    // 그룹 관리
+    val groupId: UUID? = null,
+
+    val isActive: Boolean = true,
+
+    // BaseEntity 합성 (상속 대신 합성 사용)
+    val baseEntity: BaseEntity = BaseEntity()
+) {
+    // 편의 프로퍼티로 BaseEntity 필드 접근
+    val id: UUID get() = baseEntity.id
+    val createdAt: LocalDateTime get() = baseEntity.createdAt
+    val updatedAt: LocalDateTime get() = baseEntity.updatedAt
+
+    fun updateEvaluation(rating: Double?, review: String?, tags: List<String>): Location {
+        rating?.let {
+            require(it >= 0.5 && it <= 5.0) { "평점은 0.5-5.0 사이의 값이어야 합니다" }
+            require(it % 0.5 == 0.0) { "평점은 0.5 단위여야 합니다" }
+        }
+        return copy(
+            rating = rating,
+            review = review,
+            tags = tags,
+            baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now())
+        )
     }
 
     fun deactivate(): Location {
-        return Location(/* all fields with isActive = false */)
+        return copy(
+            isActive = false,
+            baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now())
+        )
     }
+
+    fun toggleFavorite(): Location {
+        return copy(
+            isFavorite = !isFavorite,
+            baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now())
+        )
+    }
+
+    // 도메인 검증 로직
+    fun isOwnedBy(checkUserId: UUID): Boolean = userId == checkUserId
+    fun belongsToGroup(checkGroupId: UUID): Boolean = groupId == checkGroupId
 }
 
 // 2. JPA Entity for Database Mapping
 @Entity
 @Table(name = "locations", schema = "location")
-class LocationJpaEntity(
-    @Id @UuidGenerator val id: UUID? = null,
+data class LocationJpaEntity(
+    @Id @UuidGenerator(style = UuidGenerator.Style.TIME) val id: UUID? = null,
+    @Column(name = "user_id", nullable = false) val userId: UUID,
     @Column(name = "name", nullable = false, length = 100) val name: String,
-    @Column(name = "description", length = 500) val description: String? = null,
-    @Enumerated(EnumType.STRING) @Column(name = "category") val category: CategoryType,
-    @Embedded val coordinates: CoordinatesEmbeddable,
-    @Column(name = "created_by", nullable = false) val createdBy: UUID,
-    @Column(name = "average_rating", precision = 3, scale = 2) val averageRating: BigDecimal? = null,
-    @Column(name = "review_count", nullable = false) val reviewCount: Long = 0,
+    @Column(name = "description", length = 1000) val description: String? = null,
+    @Column(name = "address", length = 200) val address: String? = null,
+    @Column(name = "category_id", nullable = false) val categoryId: UUID,
+    @Column(name = "latitude", nullable = false) val latitude: Double,
+    @Column(name = "longitude", nullable = false) val longitude: Double,
+    @Column(name = "icon_url", length = 500) val iconUrl: String? = null,
+    @Column(name = "rating") val rating: Double? = null,
+    @Column(name = "review", length = 2000) val review: String? = null,
+    @Column(name = "tags") @Convert(converter = StringListConverter::class) val tags: List<String> = emptyList(),
+    @Column(name = "is_favorite", nullable = false) val isFavorite: Boolean = false,
+    @Column(name = "group_id") val groupId: UUID? = null,
     @Column(name = "is_active", nullable = false) val isActive: Boolean = true,
-    @CreatedDate @Column(name = "created_at", nullable = false) val createdAt: LocalDateTime = LocalDateTime.now(),
+    @CreatedDate @Column(name = "created_at", nullable = false, updatable = false) val createdAt: LocalDateTime = LocalDateTime.now(),
     @LastModifiedDate @Column(name = "updated_at", nullable = false) val updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
     fun toDomain(): Location {
-        return Location(/* conversion from JPA to Domain */).apply {
-            // BaseEntity 필드 설정 (리플렉션 사용)
-            setBaseEntityFields(this@LocationJpaEntity.id!!, this@LocationJpaEntity.createdAt, this@LocationJpaEntity.updatedAt)
-        }
+        return Location(
+            userId = userId,
+            name = name,
+            description = description,
+            address = address,
+            categoryId = categoryId,
+            coordinates = Coordinates(latitude, longitude),
+            iconUrl = iconUrl,
+            rating = rating,
+            review = review,
+            tags = tags,
+            isFavorite = isFavorite,
+            groupId = groupId,
+            isActive = isActive,
+            baseEntity = BaseEntity(id = id!!, createdAt = createdAt, updatedAt = updatedAt)
+        )
     }
 
     companion object {
         fun fromDomain(location: Location): LocationJpaEntity {
-            return LocationJpaEntity(/* conversion from Domain to JPA */)
+            return LocationJpaEntity(
+                id = location.id,
+                userId = location.userId,
+                name = location.name,
+                description = location.description,
+                address = location.address,
+                categoryId = location.categoryId,
+                latitude = location.coordinates.latitude,
+                longitude = location.coordinates.longitude,
+                iconUrl = location.iconUrl,
+                rating = location.rating,
+                review = location.review,
+                tags = location.tags,
+                isFavorite = location.isFavorite,
+                groupId = location.groupId,
+                isActive = location.isActive,
+                createdAt = location.createdAt,
+                updatedAt = location.updatedAt
+            )
         }
     }
 }
@@ -401,13 +569,40 @@ Clean Architecture 순서에 따른 TDD 개발:
 
 ### Clean Architecture Testing Strategy
 ```kotlin
-// 1. Domain Layer Test (Pure business logic)
+// 1. Domain Layer Test (Pure business logic, no Spring context)
 class LocationTest {
     @Test
     fun `should update rating when valid values provided`() {
-        val location = Location.create(/* parameters */)
-        val updated = location.updateRating(BigDecimal("4.5"), 10)
-        assertThat(updated.averageRating).isEqualTo(BigDecimal("4.5"))
+        // Given
+        val location = Location.create(
+            userId = UUID.randomUUID(),
+            name = "맛집",
+            description = null,
+            address = "서울시 강남구",
+            categoryId = UUID.randomUUID(),
+            coordinates = Coordinates(37.5, 127.0)
+        )
+
+        // When
+        val updated = location.updateEvaluation(
+            rating = 4.5,
+            review = "정말 맛있어요!",
+            tags = listOf("맛집", "분위기좋음")
+        )
+
+        // Then
+        assertThat(updated.rating).isEqualTo(4.5)
+        assertThat(updated.review).isEqualTo("정말 맛있어요!")
+        assertThat(updated.tags).containsExactly("맛집", "분위기좋음")
+    }
+
+    @Test
+    fun `should throw exception when rating is out of range`() {
+        val location = Location.create(/* ... */)
+
+        assertThrows<IllegalArgumentException> {
+            location.updateEvaluation(rating = 6.0, review = null, tags = emptyList())
+        }
     }
 }
 
@@ -465,9 +660,17 @@ testImplementation("org.testcontainers:kafka")         // Notification Service
 ### Common Issues
 
 #### Architecture Issues
-- **BaseEntity import 오류**: `com.kangpark.openspot.common.core.BaseEntity` 대신 `com.kangpark.openspot.common.core.domain.BaseEntity` 사용
-- **Domain/JPA Entity 혼재**: Domain Entity는 순수 비즈니스 로직만, JPA Entity는 별도 클래스로 분리
-- **Repository 구현 오류**: Domain Repository 인터페이스와 JPA Repository 구현체를 명확히 분리
+- **BaseEntity 사용 패턴**: Domain Entity에서 `BaseEntity`를 합성으로 사용 (상속 대신)
+  - `val baseEntity: BaseEntity = BaseEntity()` 형태로 선언
+  - `val id: UUID get() = baseEntity.id` 형태로 편의 프로퍼티 제공
+- **Domain/JPA Entity 분리**:
+  - Domain Entity: `domain/entity/` 패키지, 순수 비즈니스 로직만
+  - JPA Entity: `repository/jpa/entity/` 패키지, DB 매핑 전용
+  - 변환 메서드: `toDomain()`, `fromDomain()` companion object로 제공
+- **Repository 패턴**:
+  - Domain Repository Interface: `domain/repository/` 패키지
+  - JPA Repository: `repository/jpa/` 패키지 (Spring Data JPA)
+  - Repository Implementation: `repository/impl/` 패키지 (Domain Repository 구현)
 
 #### Infrastructure Issues
 - **Port conflicts**: Config (9999), Gateway (8080), services (8081-8083)
@@ -507,45 +710,77 @@ spring:
 
 ### Key API Endpoints
 
-**Endpoint Convention**: 사용자 개인 정보 관련 엔드포인트는 `/users/self` 패턴 사용
+**Endpoint Convention**: 사용자 개인 정보 관련 엔드포인트는 `/users/self`, `/locations/self` 패턴 사용
 
 ```bash
+# ========================================
 # Auth Service (8081)
-GET  /api/v1/auth/google/login?redirect_uri=<url>  # Google OAuth2 login
-GET  /api/v1/users/self                           # Current user profile
-POST /api/v1/auth/token/refresh                   # JWT token refresh
-POST /api/v1/auth/logout                          # Logout
+# ========================================
+GET  /api/v1/auth/google/login?redirect_uri=<url>  # Google OAuth2 로그인 시작
+POST /api/v1/auth/token/refresh                   # JWT 토큰 갱신
+POST /api/v1/auth/logout                          # 로그아웃
 
+# Users
+GET  /api/v1/users/self                           # 현재 사용자 프로필 조회
+GET  /api/v1/users/{userId}                       # 특정 사용자 프로필 조회 (관리자/친구용)
+
+# ========================================
 # Location Service (8082)
-GET    /api/v1/categories                         # 카테고리 목록 (public)
-GET    /api/v1/locations                          # 장소 목록 조회 (검색/필터 지원)
-POST   /api/v1/locations                          # 새 장소 생성
-GET    /api/v1/locations/{id}                     # 장소 상세 조회
-PUT    /api/v1/locations/{id}                     # 장소 기본 정보 수정
-DELETE /api/v1/locations/{id}                     # 장소 비활성화
-PUT    /api/v1/locations/{id}/evaluation          # 개인 평가 정보 수정 (평점, 리뷰, 태그)
-PUT    /api/v1/locations/{id}/group               # 장소 그룹 변경
-PUT    /api/v1/locations/{id}/coordinates         # 장소 좌표 수정
-GET    /api/v1/locations/top-rated                # 최고 평점 장소 목록
-GET    /api/v1/locations/recent                   # 최근 등록 장소 목록
-GET    /api/v1/locations/self                     # 내 장소 목록
-GET    /api/v1/locations/groups/{groupId}         # 그룹별 장소 목록
+# ========================================
+
+# Categories (Public - 인증 불필요)
+GET  /api/v1/categories                           # 카테고리 목록 조회
+
+# Locations
+GET  /api/v1/locations                            # 장소 목록 조회 (다양한 검색 옵션)
+     # Query Parameters:
+     # - bounds: northEastLat, northEastLon, southWestLat, southWestLon (지도 영역 검색)
+     # - radius: latitude, longitude, radiusMeters (반경 검색)
+     # - groupId: 그룹 필터
+     # - categoryId: 카테고리 필터
+     # - keyword: 키워드 검색
+     # - sortBy: RATING | CREATED_AT (정렬)
+     # - targetUserId: 조회할 사용자 (친구 기능용, 미지정 시 본인)
+     # - page, size: 페이지네이션
+
+POST /api/v1/locations                            # 새 장소 생성
+GET  /api/v1/locations/{locationId}               # 장소 상세 조회
+PUT  /api/v1/locations/{locationId}               # 장소 통합 수정 (부분 업데이트)
+     # 수정 가능 필드: name, description, address, categoryId, iconUrl,
+     #               rating, review, tags, groupId, coordinates
+DELETE /api/v1/locations/{locationId}             # 장소 비활성화 (논리적 삭제)
+GET  /api/v1/locations/self?sortBy=RATING         # 내 장소 목록 (정렬 가능)
 
 # Location Groups
 GET    /api/v1/locations/groups                   # 그룹 목록 조회
 POST   /api/v1/locations/groups                   # 그룹 생성
 PUT    /api/v1/locations/groups/{groupId}         # 그룹 수정
 DELETE /api/v1/locations/groups/{groupId}         # 그룹 삭제
-PUT    /api/v1/locations/groups/reorder           # 그룹 순서 변경
+PUT    /api/v1/locations/groups/reorder           # 그룹 순서 변경 (드래그 앤 드롭)
 
+# ========================================
 # Notification Service (8083)
-POST   /api/v1/notifications/tokens               # 디바이스 토큰 등록
-GET    /api/v1/notifications                      # 알림 목록 조회
-GET    /api/v1/notifications/unread-count         # 읽지 않은 알림 수
-PUT    /api/v1/notifications/{id}/read            # 알림 읽음 처리
-GET    /api/v1/notifications/settings             # 알림 설정 조회
-PUT    /api/v1/notifications/settings             # 알림 설정 업데이트
+# ========================================
+POST /api/v1/notifications/tokens                 # FCM 디바이스 토큰 등록
+GET  /api/v1/notifications                        # 알림 목록 조회 (페이지네이션)
+GET  /api/v1/notifications/unread-count           # 읽지 않은 알림 수
+PUT  /api/v1/notifications/{notificationId}/read  # 알림 읽음 처리
+GET  /api/v1/notifications/settings               # 알림 설정 조회
+PUT  /api/v1/notifications/settings               # 알림 설정 업데이트
 ```
+
+**중요 변경사항**:
+- ❌ 삭제된 엔드포인트:
+  - `PUT /api/v1/locations/{id}/evaluation` - 통합 수정으로 대체
+  - `PUT /api/v1/locations/{id}/group` - 통합 수정으로 대체
+  - `PUT /api/v1/locations/{id}/coordinates` - 통합 수정으로 대체
+  - `GET /api/v1/locations/top-rated` - GET /locations?sortBy=RATING으로 대체
+  - `GET /api/v1/locations/recent` - GET /locations?sortBy=CREATED_AT으로 대체
+  - `GET /api/v1/locations/groups/{groupId}` - GET /locations?groupId={groupId}로 대체
+
+- ✅ 통합 엔드포인트:
+  - `PUT /api/v1/locations/{id}` - 모든 필드 부분 업데이트 지원
+  - `GET /api/v1/locations` - 다양한 쿼리 파라미터로 유연한 검색
 
 ### Swagger API Documentation
 ```bash
@@ -558,4 +793,72 @@ http://localhost:8083/swagger-ui.html    # Notification Service API 문서
 http://localhost:8080/auth/swagger-ui.html
 http://localhost:8080/locations/swagger-ui.html
 http://localhost:8080/notifications/swagger-ui.html
+```
+
+## OpenAPI Specification
+
+프로젝트 루트의 `openapi.yaml` 파일은 OpenAPI 3.1.1 스펙을 따르며, 프론트엔드 TypeScript 클라이언트 자동 생성에 사용됩니다.
+
+### 주요 특징
+- **인증 방식**: Bearer Token (Access Token) + HttpOnly Cookie (Refresh Token)
+- **MSA 구조**: Gateway(8080)를 통한 통합 API 진입점
+- **한국어 문서화**: 모든 엔드포인트와 스키마에 한국어 설명 포함
+- **TypeScript 클라이언트 생성**: openapi-generator-cli로 타입 안전한 API 클라이언트 생성 가능
+
+### 인증 플로우 (MSA 표준)
+1. 클라이언트 → Gateway: `Authorization: Bearer <token>` 헤더 포함
+2. Gateway: JWT 검증 (HS256 알고리즘)
+3. Gateway: 검증 성공 시 `X-User-Id` 헤더 추가
+4. 내부 서비스: `X-User-Id` 헤더로 사용자 식별 (JWT 검증 불필요)
+
+## 핵심 설계 원칙
+
+### 1. Domain Entity는 Data Class + Composition 패턴
+- **상속 대신 합성**: `BaseEntity`를 상속하지 않고 합성으로 사용
+- **불변성**: `data class`와 `copy()` 메서드로 불변 객체 패턴 적용
+- **순수 함수**: 모든 도메인 메서드는 새 객체를 반환 (side-effect 없음)
+
+```kotlin
+// ✅ Good: Composition pattern
+data class Location(
+    val name: String,
+    val baseEntity: BaseEntity = BaseEntity()
+) {
+    val id: UUID get() = baseEntity.id
+    fun updateName(newName: String) = copy(name = newName)
+}
+
+// ❌ Bad: Inheritance pattern
+class Location(val name: String) : BaseEntity() {
+    fun updateName(newName: String) {
+        this.name = newName  // mutable
+    }
+}
+```
+
+### 2. JPA Entity는 별도 패키지에 완전 분리
+- **Domain Entity**: `domain/entity/` - 순수 비즈니스 로직
+- **JPA Entity**: `repository/jpa/entity/` - DB 매핑 전용
+- **변환 책임**: JPA Entity가 Domain Entity로의 변환 책임
+
+### 3. Repository 3-Layer 구조
+```
+domain/repository/LocationRepository.kt         # Interface (Domain Layer)
+repository/jpa/LocationJpaRepository.kt         # Spring Data JPA (Infrastructure)
+repository/impl/LocationRepositoryImpl.kt       # Implementation (Infrastructure)
+```
+
+### 4. Use Case 단위 서비스 설계
+각 Use Case를 독립적인 클래스로 분리:
+```
+service/usecase/CreateLocationUseCase.kt
+service/usecase/UpdateLocationUseCase.kt
+service/usecase/SearchLocationUseCase.kt
+```
+
+### 5. API 응답 일관성
+모든 API는 `ApiResponse<T>` wrapper 사용 (common-web 제공):
+```kotlin
+ApiResponse.success(data)           // 성공 응답
+ApiResponse.error(code, message)    // 에러 응답
 ```

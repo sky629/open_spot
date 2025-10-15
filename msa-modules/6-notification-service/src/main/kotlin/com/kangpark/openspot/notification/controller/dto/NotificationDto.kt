@@ -1,8 +1,8 @@
 package com.kangpark.openspot.notification.controller.dto
 
 import com.kangpark.openspot.notification.domain.vo.DeviceType
-import com.kangpark.openspot.notification.domain.Notification
-import com.kangpark.openspot.notification.domain.NotificationSettings
+import com.kangpark.openspot.notification.domain.entity.Notification
+import com.kangpark.openspot.notification.domain.entity.NotificationSettings
 import com.kangpark.openspot.notification.domain.vo.NotificationType
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull

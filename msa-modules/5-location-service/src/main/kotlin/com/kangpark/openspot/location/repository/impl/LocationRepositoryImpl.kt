@@ -36,17 +36,12 @@ class LocationRepositoryImpl(
         longitude: Double,
         radiusMeters: Double,
         categoryId: UUID?,
+        groupId: UUID?,
         pageable: Pageable
     ): Page<Location> {
-        return if (categoryId != null) {
-            locationJpaRepository.findByUserIdAndCategoryIdWithinRadius(
-                userId, categoryId, latitude, longitude, radiusMeters, pageable
-            )
-        } else {
-            locationJpaRepository.findByUserIdWithinRadius(
-                userId, latitude, longitude, radiusMeters, pageable
-            )
-        }.map { it.toDomain() }
+        return locationJpaRepository.findByCoordinatesWithinRadiusDynamic(
+            userId, latitude, longitude, radiusMeters, categoryId, groupId, pageable
+        ).map { it.toDomain() }
     }
 
     override fun findByCoordinatesWithinBounds(
@@ -56,17 +51,12 @@ class LocationRepositoryImpl(
         southWestLat: Double,
         southWestLon: Double,
         categoryId: UUID?,
+        groupId: UUID?,
         pageable: Pageable
     ): Page<Location> {
-        return if (categoryId != null) {
-            locationJpaRepository.findByUserIdAndCategoryIdWithinBounds(
-                userId, categoryId, northEastLat, northEastLon, southWestLat, southWestLon, pageable
-            )
-        } else {
-            locationJpaRepository.findByUserIdWithinBounds(
-                userId, northEastLat, northEastLon, southWestLat, southWestLon, pageable
-            )
-        }.map { it.toDomain() }
+        return locationJpaRepository.findByCoordinatesWithinBoundsDynamic(
+            userId, northEastLat, northEastLon, southWestLat, southWestLon, categoryId, groupId, pageable
+        ).map { it.toDomain() }
     }
 
     override fun findByUserIdAndCategoryId(userId: UUID, categoryId: UUID, pageable: Pageable): Page<Location> {
@@ -75,12 +65,13 @@ class LocationRepositoryImpl(
     }
 
     override fun findByUserIdAndKeyword(userId: UUID, keyword: String, pageable: Pageable): Page<Location> {
-        return locationJpaRepository.findByUserIdAndKeywordOrderByCreatedAtDesc(userId, keyword, pageable)
+        // QueryDSL Custom Repository 사용
+        return locationJpaRepository.findByUserIdAndKeyword(userId, keyword, pageable)
             .map { it.toDomain() }
     }
 
     override fun findTopRatedLocationsByUser(userId: UUID, pageable: Pageable): Page<Location> {
-        return locationJpaRepository.findByUserIdAndIsActiveTrueAndPersonalRatingIsNotNullOrderByPersonalRatingDescCreatedAtDesc(userId, pageable)
+        return locationJpaRepository.findByUserIdAndIsActiveTrueAndRatingIsNotNullOrderByRatingDescCreatedAtDesc(userId, pageable)
             .map { it.toDomain() }
     }
 
@@ -108,8 +99,8 @@ class LocationRepositoryImpl(
     }
 
     override fun countByUserIdAndCategoryId(userId: UUID): Map<UUID, Long> {
-        return locationJpaRepository.countByUserIdAndCategoryId(userId)
-            .associate { it.getCategoryId() to it.getCount() }
+        // QueryDSL Custom Repository 사용
+        return locationJpaRepository.countByUserIdGroupByCategory(userId)
     }
 
     override fun existsById(id: UUID): Boolean {

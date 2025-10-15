@@ -29,10 +29,11 @@ class SearchLocationUseCase(
         longitude: Double,
         radiusMeters: Double,
         categoryId: UUID? = null,
+        groupId: UUID? = null,
         pageable: Pageable
     ): Page<Location> {
         return locationRepository.findByCoordinatesWithinRadius(
-            userId, latitude, longitude, radiusMeters, categoryId, pageable
+            userId, latitude, longitude, radiusMeters, categoryId, groupId, pageable
         )
     }
 
@@ -46,10 +47,11 @@ class SearchLocationUseCase(
         southWestLat: Double,
         southWestLon: Double,
         categoryId: UUID? = null,
+        groupId: UUID? = null,
         pageable: Pageable
     ): Page<Location> {
         return locationRepository.findByCoordinatesWithinBounds(
-            userId, northEastLat, northEastLon, southWestLat, southWestLon, categoryId, pageable
+            userId, northEastLat, northEastLon, southWestLat, southWestLon, categoryId, groupId, pageable
         )
     }
 
@@ -107,13 +109,13 @@ class SearchLocationUseCase(
         latitude: Double,
         longitude: Double,
         categoryId: UUID? = null,
-        limit: Int = 10
+        limit: Int = 20
     ): List<Location> {
         val maxRadius = 10000.0 // 10km
         val pageable = PageRequest.of(0, limit)
 
         return locationRepository.findByCoordinatesWithinRadius(
-            userId, latitude, longitude, maxRadius, categoryId, pageable
+            userId, latitude, longitude, maxRadius, categoryId, null, pageable
         ).content
     }
 }

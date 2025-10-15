@@ -1,15 +1,15 @@
 package com.kangpark.openspot.notification.service
 
-import com.kangpark.openspot.notification.domain.DeviceToken
-import com.kangpark.openspot.notification.domain.Notification
-import com.kangpark.openspot.notification.domain.NotificationSettings
+import com.kangpark.openspot.notification.domain.entity.DeviceToken
+import com.kangpark.openspot.notification.domain.entity.Notification
+import com.kangpark.openspot.notification.domain.entity.NotificationSettings
 import com.kangpark.openspot.notification.domain.vo.DeviceType
 import com.kangpark.openspot.notification.domain.vo.NotificationType
 import com.kangpark.openspot.notification.event.ReportGeneratedEvent
 import com.kangpark.openspot.notification.event.SystemNoticeEvent
-import com.kangpark.openspot.notification.repository.DeviceTokenRepository
-import com.kangpark.openspot.notification.repository.NotificationRepository
-import com.kangpark.openspot.notification.repository.NotificationSettingsRepository
+import com.kangpark.openspot.notification.domain.repository.DeviceTokenRepository
+import com.kangpark.openspot.notification.domain.repository.NotificationRepository
+import com.kangpark.openspot.notification.domain.repository.NotificationSettingsRepository
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -95,7 +95,7 @@ class NotificationService(
      */
     private fun sendPushNotification(notification: Notification) {
         try {
-            val deviceTokens = deviceTokenRepository.findByUserIdAndIsActiveTrue(notification.userId)
+            val deviceTokens = deviceTokenRepository.findActiveByUserId(notification.userId)
 
             if (deviceTokens.isEmpty()) {
                 logger.warn("No active device tokens found for user: {}", notification.userId)
@@ -109,16 +109,16 @@ class NotificationService(
                 // 단일 디바이스 전송
                 val messageId = fcmService.sendNotification(deviceTokens.first(), notification)
                 if (messageId != null) {
-                    notification.markAsSent(messageId)
-                    notificationRepository.save(notification)
+                    val updated = notification.markAsSent(messageId)
+                    notificationRepository.save(updated)
                 }
             } else {
                 // 다중 디바이스 전송
                 val response = fcmService.sendMulticastNotification(deviceTokens, notification)
                 response?.let {
                     if (it.successCount > 0) {
-                        notification.markAsSent("multicast_${UUID.randomUUID()}")
-                        notificationRepository.save(notification)
+                        val updated = notification.markAsSent("multicast_${UUID.randomUUID()}")
+                        notificationRepository.save(updated)
                     }
 
                     // 실패한 토큰들 비활성화
@@ -126,7 +126,8 @@ class NotificationService(
                         if (!sendResponse.isSuccessful) {
                             val token = deviceTokens[index]
                             logger.warn("Deactivating failed token: {}", token.token.take(10) + "...")
-                            deviceTokenRepository.deactivateByToken(token.token)
+                            val deactivated = token.deactivate()
+                            deviceTokenRepository.save(deactivated)
                         }
                     }
                 }
@@ -145,11 +146,11 @@ class NotificationService(
 
         return if (existingToken != null) {
             // 기존 토큰 업데이트
-            existingToken.markAsUsed()
-            if (!existingToken.isActive) {
-                existingToken.activate()
+            var updated = existingToken.markAsUsed()
+            if (!updated.isActive) {
+                updated = updated.activate()
             }
-            deviceTokenRepository.save(existingToken)
+            deviceTokenRepository.save(updated)
         } else {
             // 새 토큰 생성
             val newToken = DeviceToken(
@@ -182,11 +183,11 @@ class NotificationService(
      * 알림 읽음 처리
      */
     fun markNotificationAsRead(userId: UUID, notificationId: UUID): Boolean {
-        val notification = notificationRepository.findById(notificationId).orElse(null)
+        val notification = notificationRepository.findById(notificationId)
 
         return if (notification != null && notification.userId == userId) {
-            notification.markAsRead()
-            notificationRepository.save(notification)
+            val updated = notification.markAsRead()
+            notificationRepository.save(updated)
             true
         } else {
             false
@@ -214,8 +215,8 @@ class NotificationService(
      */
     fun updateNotificationSettings(userId: UUID, reportEnabled: Boolean, systemEnabled: Boolean): NotificationSettings {
         val settings = getOrCreateNotificationSettings(userId)
-        settings.updateAllSettings(reportEnabled, systemEnabled)
-        return notificationSettingsRepository.save(settings)
+        val updated = settings.updateAllSettings(reportEnabled, systemEnabled)
+        return notificationSettingsRepository.save(updated)
     }
 
     /**

@@ -32,15 +32,16 @@ COMMENT ON COLUMN location.categories.display_name IS '표시명 (음식점, 카
 -- 기본 카테고리 데이터 INSERT
 INSERT INTO location.categories (code, display_name, description, icon, color, display_order) VALUES
 ('RESTAURANT', '음식점', '식당, 레스토랑, 요리점 등', 'restaurant', '#FF5722', 1),
-('CAFE', '카페', '커피숍, 디저트 카페, 베이커리 등', 'local_cafe', '#795548', 2),
-('SHOPPING', '쇼핑', '마트, 백화점, 쇼핑몰, 전문매장 등', 'shopping_cart', '#E91E63', 3),
+('CAFE', '카페', '커피숍, 디저트 카페, 베이커리 등', 'cafe', '#795548', 2),
+('SHOPPING', '쇼핑', '마트, 백화점, 쇼핑몰, 전문매장 등', 'shopping', '#E91E63', 3),
 ('PARK', '공원', '도시공원, 놀이터, 산책로 등', 'park', '#4CAF50', 4),
-('ENTERTAINMENT', '놀거리', '영화관, 노래방, 게임장, 클럽 등', 'movie', '#9C27B0', 5),
-('ACCOMMODATION', '숙소', '호텔, 모텔, 게스트하우스, 펜션 등', 'hotel', '#2196F3', 6),
-('HOSPITAL', '병원', '종합병원, 의원, 치과, 약국 등', 'local_hospital', '#F44336', 7),
-('EDUCATION', '교육', '학교, 학원, 도서관, 미술관 등', 'school', '#3F51B5', 8),
-('BEAUTY', '뷰티', '미용실, 네일샵, 피부관리실, 마사지샵 등', 'face', '#E91E63', 9),
-('FITNESS', '운동', '헬스장, 수영장, 요가원, 스포츠센터 등', 'fitness_center', '#FF9800', 10);
+('ENTERTAINMENT', '놀거리', '영화관, 노래방, 게임장, 클럽 등', 'entertainment', '#9C27B0', 5),
+('ACCOMMODATION', '숙소', '호텔, 모텔, 게스트하우스, 펜션 등', 'accommodation', '#2196F3', 6),
+('HOSPITAL', '병원', '종합병원, 의원, 치과, 약국 등', 'hospital', '#F44336', 7),
+('EDUCATION', '교육', '학교, 학원, 도서관, 미술관 등', 'education', '#3F51B5', 8),
+('BEAUTY', '뷰티', '미용실, 네일샵, 피부관리실, 마사지샵 등', 'beauty', '#E91E63', 9),
+('FITNESS', '운동', '헬스장, 수영장, 요가원, 스포츠센터 등', 'fitness', '#FF9800', 10),
+('ETC', '기타', '기타 등', 'etc', '#000000', 99);
 
 -- 2. LocationGroup 테이블 생성
 CREATE TABLE location.location_groups (
@@ -80,8 +81,8 @@ CREATE TABLE location.locations (
     icon_url VARCHAR(500),
 
     -- 개인 평가 정보
-    personal_rating INTEGER CHECK (personal_rating >= 1 AND personal_rating <= 5),
-    personal_review TEXT,
+    rating NUMERIC(2,1) CHECK (rating >= 0.5 AND rating <= 5.0 AND MOD(rating::numeric * 10, 5) = 0),
+    review TEXT,
     tags TEXT[],
 
     -- 그룹 관리
@@ -113,8 +114,8 @@ CREATE INDEX idx_location_created_at ON location.locations(created_at DESC);
 COMMENT ON TABLE location.locations IS '개인 장소 기록';
 COMMENT ON COLUMN location.locations.user_id IS '장소 소유자 ID';
 COMMENT ON COLUMN location.locations.category_id IS '카테고리 ID (FK)';
-COMMENT ON COLUMN location.locations.personal_rating IS '개인 평점 (1-5)';
-COMMENT ON COLUMN location.locations.personal_review IS '개인 리뷰/메모';
+COMMENT ON COLUMN location.locations.rating IS '개인 평점 (0.5-5.0, 0.5 단위)';
+COMMENT ON COLUMN location.locations.review IS '개인 리뷰/메모';
 COMMENT ON COLUMN location.locations.tags IS '개인 태그 배열';
 COMMENT ON COLUMN location.locations.group_id IS '속한 그룹 ID';
 COMMENT ON COLUMN location.locations.is_favorite IS '즐겨찾기 여부';

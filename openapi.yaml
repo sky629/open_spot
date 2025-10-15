@@ -279,8 +279,16 @@ paths:
     get:
       tags:
         - Locations
-      summary: 장소 목록 조회
-      description: 다양한 조건으로 장소를 검색합니다.
+      summary: 장소 목록 조회 (어드민/일반 공용)
+      description: |
+        다양한 조건으로 장소를 조회합니다.
+        - bounds 파라미터: 지도 영역 내 검색 (우선순위 1, groupId 함께 사용 가능)
+        - radius 파라미터: 반경 검색 (우선순위 2, groupId 함께 사용 가능)
+        - groupId: 그룹 필터 (우선순위 3, 기본 정렬: createdAt)
+        - categoryId: 카테고리 필터 (우선순위 4, 기본 정렬: createdAt)
+        - keyword: 키워드 검색 (우선순위 5, 기본 정렬: 관련도)
+        - sortBy: 정렬 기준 (기본 조회 시에만 적용, RATING 또는 CREATED_AT)
+        - targetUserId: 조회할 사용자 (미지정 시 본인, 어드민/친구 기능용)
       operationId: getLocations
       parameters:
         - $ref: '#/components/parameters/NorthEastLatParam'
@@ -291,7 +299,9 @@ paths:
         - $ref: '#/components/parameters/LongitudeParam'
         - $ref: '#/components/parameters/RadiusMetersParam'
         - $ref: '#/components/parameters/CategoryIdParam'
+        - $ref: '#/components/parameters/GroupIdParam'
         - $ref: '#/components/parameters/KeywordParam'
+        - $ref: '#/components/parameters/SortByParam'
         - $ref: '#/components/parameters/TargetUserIdParam'
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/SizeParam'
@@ -306,7 +316,7 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/LocationSummaryPageResponse'
+                        $ref: '#/components/schemas/LocationPageResponse'
 
     post:
       tags:
@@ -362,8 +372,16 @@ paths:
     put:
       tags:
         - Locations
-      summary: 장소 기본 정보 수정
-      description: 장소의 기본 정보를 수정합니다.
+      summary: 장소 정보 통합 수정
+      description: |
+        장소의 모든 정보를 통합하여 수정합니다 (부분 업데이트 지원).
+        제공된 필드만 업데이트되며, null인 필드는 기존 값을 유지합니다.
+
+        수정 가능한 정보:
+        - 기본 정보: name, description, address, categoryId, iconUrl
+        - 평가 정보: rating, review, tags
+        - 그룹: groupId
+        - 좌표: coordinates (latitude, longitude는 함께 업데이트됨)
       operationId: updateLocation
       parameters:
         - $ref: '#/components/parameters/LocationIdParam'
@@ -419,148 +437,18 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/locations/{locationId}/evaluation:
-    put:
-      tags:
-        - Locations
-      summary: 개인 평가 정보 수정
-      description: 장소에 대한 개인 평점, 리뷰, 태그를 수정합니다.
-      operationId: updateLocationEvaluation
-      parameters:
-        - $ref: '#/components/parameters/LocationIdParam'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateLocationEvaluationRequest'
-      responses:
-        '200':
-          description: 평가 정보 수정 성공
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/LocationResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /api/v1/locations/{locationId}/group:
-    put:
-      tags:
-        - Locations
-      summary: 장소 그룹 변경
-      description: 장소가 속한 그룹을 변경합니다.
-      operationId: changeLocationGroup
-      parameters:
-        - $ref: '#/components/parameters/LocationIdParam'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ChangeLocationGroupRequest'
-      responses:
-        '200':
-          description: 그룹 변경 성공
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/LocationResponse'
-
-  /api/v1/locations/{locationId}/coordinates:
-    put:
-      tags:
-        - Locations
-      summary: 장소 좌표 수정
-      description: 장소의 GPS 좌표를 수정합니다.
-      operationId: updateLocationCoordinates
-      parameters:
-        - $ref: '#/components/parameters/LocationIdParam'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateLocationCoordinatesRequest'
-      responses:
-        '200':
-          description: 좌표 수정 성공
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/LocationResponse'
-
-  /api/v1/locations/top-rated:
-    get:
-      tags:
-        - Locations
-      summary: 최고 평점 장소 목록
-      description: 내 개인 평점 기준 최고 평점 장소 목록을 조회합니다.
-      operationId: getTopRatedLocations
-      parameters:
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/SizeParam'
-      responses:
-        '200':
-          description: 최고 평점 장소 목록 조회 성공
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/LocationSummaryPageResponse'
-
-  /api/v1/locations/recent:
-    get:
-      tags:
-        - Locations
-      summary: 최근 등록 장소 목록
-      description: 최근 등록한 내 장소 목록을 조회합니다.
-      operationId: getRecentLocations
-      parameters:
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/SizeParam'
-      responses:
-        '200':
-          description: 최근 등록 장소 목록 조회 성공
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/LocationSummaryPageResponse'
-
   /api/v1/locations/self:
     get:
       tags:
         - Locations
-      summary: 내 장소 목록
-      description: 내가 생성한 모든 장소 목록을 조회합니다.
+      summary: 내 장소 목록 (일반 사용자용)
+      description: |
+        내가 생성한 모든 장소 목록을 조회합니다.
+        - sortBy: 정렬 기준 (RATING: 평점순, CREATED_AT: 최근 등록순, 기본값: CREATED_AT)
+        - 본인의 장소만 조회 가능 (X-User-Id 자동 사용)
       operationId: getMyLocations
       parameters:
+        - $ref: '#/components/parameters/SortByParam'
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/SizeParam'
       responses:
@@ -574,38 +462,9 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/LocationSummaryPageResponse'
+                        $ref: '#/components/schemas/LocationPageResponse'
 
   /api/v1/locations/groups/{groupId}:
-    get:
-      tags:
-        - Locations
-      summary: 그룹별 장소 목록
-      description: 특정 그룹에 속한 내 장소 목록을 조회합니다.
-      operationId: getLocationsByGroup
-      parameters:
-        - name: groupId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-            nullable: true
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/SizeParam'
-      responses:
-        '200':
-          description: 그룹별 장소 목록 조회 성공
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/LocationSummaryPageResponse'
-
     put:
       tags:
         - Location Groups
@@ -943,6 +802,14 @@ components:
         type: string
         format: uuid
 
+    GroupIdParam:
+      name: groupId
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+
     NorthEastLatParam:
       name: northEastLat
       in: query
@@ -1020,6 +887,18 @@ components:
       schema:
         type: string
         maxLength: 100
+
+    SortByParam:
+      name: sortBy
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [RATING, CREATED_AT]
+      description: |
+        정렬 기준 (기본 조회 시에만 적용)
+        - RATING: 평점 높은 순
+        - CREATED_AT: 최근 등록순 (기본값)
 
     TargetUserIdParam:
       name: targetUserId
@@ -1315,12 +1194,14 @@ components:
           format: uri
           maxLength: 500
           nullable: true
-        personalRating:
-          type: integer
-          minimum: 1
-          maximum: 5
+        rating:
+          type: number
+          format: double
+          minimum: 0.5
+          maximum: 5.0
+          multipleOf: 0.5
           nullable: true
-        personalReview:
+        review:
           type: string
           maxLength: 2000
           nullable: true
@@ -1337,13 +1218,15 @@ components:
 
     UpdateLocationRequest:
       type: object
-      required:
-        - name
-        - categoryId
+      description: |
+        장소 통합 수정 요청 (부분 업데이트).
+        모든 필드는 optional이며, 제공된 필드만 업데이트됩니다.
       properties:
+        # 기본 정보
         name:
           type: string
           maxLength: 100
+          nullable: true
         description:
           type: string
           maxLength: 1000
@@ -1355,21 +1238,22 @@ components:
         categoryId:
           type: string
           format: uuid
+          nullable: true
         iconUrl:
           type: string
           format: uri
           maxLength: 500
           nullable: true
 
-    UpdateLocationEvaluationRequest:
-      type: object
-      properties:
-        personalRating:
-          type: integer
-          minimum: 1
-          maximum: 5
+        # 평가 정보
+        rating:
+          type: number
+          format: double
+          minimum: 0.5
+          maximum: 5.0
+          multipleOf: 0.5
           nullable: true
-        personalReview:
+        review:
           type: string
           maxLength: 2000
           nullable: true
@@ -1379,16 +1263,19 @@ components:
           items:
             type: string
             maxLength: 20
+          nullable: true
 
-    ChangeLocationGroupRequest:
-      type: object
-      properties:
+        # 그룹
         groupId:
           type: string
           format: uuid
           nullable: true
 
-    UpdateLocationCoordinatesRequest:
+        # 좌표 (함께 업데이트되어야 함)
+        coordinates:
+          $ref: '#/components/schemas/CoordinatesRequest'
+
+    CoordinatesRequest:
       type: object
       required:
         - latitude
@@ -1443,10 +1330,14 @@ components:
           type: string
           format: uri
           nullable: true
-        personalRating:
-          type: integer
+        rating:
+          type: number
+          format: double
+          minimum: 0.5
+          maximum: 5.0
+          multipleOf: 0.5
           nullable: true
-        personalReview:
+        review:
           type: string
           nullable: true
         tags:
@@ -1470,41 +1361,7 @@ components:
           format: double
           nullable: true
 
-    LocationSummaryResponse:
-      type: object
-      required:
-        - id
-        - name
-        - categoryId
-        - category
-        - coordinates
-        - tags
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        categoryId:
-          type: string
-          format: uuid
-        category:
-          $ref: '#/components/schemas/CategoryInfo'
-        coordinates:
-          $ref: '#/components/schemas/CoordinatesResponse'
-        personalRating:
-          type: integer
-          nullable: true
-        tags:
-          type: array
-          items:
-            type: string
-        distance:
-          type: number
-          format: double
-          nullable: true
-
-    LocationSummaryPageResponse:
+    LocationPageResponse:
       type: object
       required:
         - content
@@ -1513,7 +1370,7 @@ components:
         content:
           type: array
           items:
-            $ref: '#/components/schemas/LocationSummaryResponse'
+            $ref: '#/components/schemas/LocationResponse'
         page:
           $ref: '#/components/schemas/PageInfo'
 

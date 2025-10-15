@@ -19,8 +19,8 @@ data class Location(
     val iconUrl: String? = null,
 
     // 개인 평가 정보
-    val personalRating: Int? = null,         // 1-5 개인 평점
-    val personalReview: String? = null,      // 개인 리뷰/메모
+    val rating: Double? = null,              // 0.5-5.0 개인 평점 (0.5 단위)
+    val review: String? = null,              // 개인 리뷰/메모
     val tags: List<String> = emptyList(),    // 개인 태그
     val isFavorite: Boolean = false,         // 즐겨찾기 여부
 
@@ -41,23 +41,24 @@ data class Location(
     /**
      * 개인 평가 업데이트
      */
-    fun updatePersonalEvaluation(
-        personalRating: Int?,
-        personalReview: String?,
+    fun updateEvaluation(
+        rating: Double?,
+        review: String?,
         tags: List<String>
     ): Location {
-        personalRating?.let {
-            require(it in 1..5) { "개인 평점은 1-5 사이의 값이어야 합니다" }
+        rating?.let {
+            require(it >= 0.5 && it <= 5.0) { "평점은 0.5-5.0 사이의 값이어야 합니다" }
+            require(it % 0.5 == 0.0) { "평점은 0.5 단위여야 합니다" }
         }
-        require(personalReview?.length ?: 0 <= 2000) { "개인 리뷰는 2000자를 초과할 수 없습니다" }
+        require(review?.length ?: 0 <= 2000) { "개인 리뷰는 2000자를 초과할 수 없습니다" }
         require(tags.size <= 10) { "태그는 최대 10개까지 등록할 수 있습니다" }
         tags.forEach { tag ->
             require(tag.length <= 20) { "각 태그는 20자를 초과할 수 없습니다" }
         }
 
         return copy(
-            personalRating = personalRating,
-            personalReview = personalReview,
+            rating = rating,
+            review = review,
             tags = tags,
             baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now())
         )
@@ -169,8 +170,8 @@ data class Location(
             categoryId: UUID,
             coordinates: Coordinates,
             iconUrl: String? = null,
-            personalRating: Int? = null,
-            personalReview: String? = null,
+            rating: Double? = null,
+            review: String? = null,
             tags: List<String> = emptyList(),
             groupId: UUID? = null
         ): Location {
@@ -179,10 +180,11 @@ data class Location(
             require((description?.length ?: 0) <= 1000) { "설명은 1000자를 초과할 수 없습니다" }
             require((address?.length ?: 0) <= 200) { "주소는 200자를 초과할 수 없습니다" }
             require((iconUrl?.length ?: 0) <= 500) { "아이콘 URL은 500자를 초과할 수 없습니다" }
-            personalRating?.let {
-                require(it in 1..5) { "개인 평점은 1-5 사이의 값이어야 합니다" }
+            rating?.let {
+                require(it >= 0.5 && it <= 5.0) { "평점은 0.5-5.0 사이의 값이어야 합니다" }
+                require(it % 0.5 == 0.0) { "평점은 0.5 단위여야 합니다" }
             }
-            require((personalReview?.length ?: 0) <= 2000) { "개인 리뷰는 2000자를 초과할 수 없습니다" }
+            require((review?.length ?: 0) <= 2000) { "개인 리뷰는 2000자를 초과할 수 없습니다" }
             require(tags.size <= 10) { "태그는 최대 10개까지 등록할 수 있습니다" }
             tags.forEach { tag ->
                 require(tag.length <= 20) { "각 태그는 20자를 초과할 수 없습니다" }
@@ -196,8 +198,8 @@ data class Location(
                 categoryId = categoryId,
                 coordinates = coordinates,
                 iconUrl = iconUrl,
-                personalRating = personalRating,
-                personalReview = personalReview,
+                rating = rating,
+                review = review,
                 tags = tags,
                 groupId = groupId
             )

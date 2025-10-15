@@ -1,12 +1,11 @@
 package com.kangpark.openspot.notification.service
 
 import com.google.firebase.messaging.*
-import com.kangpark.openspot.notification.domain.DeviceToken
+import com.kangpark.openspot.notification.domain.entity.DeviceToken
 import com.kangpark.openspot.notification.domain.vo.DeviceType
-import com.kangpark.openspot.notification.domain.Notification
+import com.kangpark.openspot.notification.domain.entity.Notification
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import java.util.*
 
 @Service
 class FCMService(

@@ -3,6 +3,7 @@ package com.kangpark.openspot.location.controller
 import com.kangpark.openspot.common.web.dto.ApiResponse
 import com.kangpark.openspot.common.web.dto.PageInfo
 import com.kangpark.openspot.common.web.dto.PageResponse
+import com.kangpark.openspot.location.controller.dto.request.*
 import com.kangpark.openspot.location.controller.dto.response.*
 import com.kangpark.openspot.location.domain.vo.Coordinates
 import com.kangpark.openspot.location.service.LocationApplicationService
@@ -28,14 +29,16 @@ class LocationController(
     private val logger = LoggerFactory.getLogger(LocationController::class.java)
 
     @Operation(
-        summary = "장소 목록 조회",
+        summary = "장소 목록 조회 (어드민/일반 공용)",
         description = """
             다양한 조건으로 장소를 조회합니다.
-            - bounds 파라미터: 지도 영역 내 검색 (우선순위 1)
-            - radius 파라미터: 반경 검색 (우선순위 2)
-            - categoryId: 카테고리 필터
-            - keyword: 키워드 검색
-            - targetUserId: 조회할 사용자 (미지정 시 본인, 향후 친구 기능용)
+            - bounds 파라미터: 지도 영역 내 검색 (우선순위 1, groupId 함께 사용 가능)
+            - radius 파라미터: 반경 검색 (우선순위 2, groupId 함께 사용 가능)
+            - groupId: 그룹 필터 (우선순위 3, 기본 정렬: createdAt)
+            - categoryId: 카테고리 필터 (우선순위 4, 기본 정렬: createdAt)
+            - keyword: 키워드 검색 (우선순위 5, 기본 정렬: 관련도)
+            - sortBy: 정렬 기준 (기본 조회 시에만 적용, RATING 또는 CREATED_AT)
+            - targetUserId: 조회할 사용자 (미지정 시 본인, 어드민/친구 기능용)
         """
     )
     @GetMapping
@@ -45,7 +48,7 @@ class LocationController(
         @Parameter(description = "사용자 ID (Gateway에서 자동 주입)", hidden = true)
         @RequestHeader("X-User-Id") userId: String,
         @PageableDefault(size = 20) pageable: Pageable
-    ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
+    ): ResponseEntity<ApiResponse<PageResponse<LocationResponse>>> {
         val userUuid = UUID.fromString(userId)
         // 조회 대상 사용자 (향후 친구 기능 확장용)
         val targetUserId = request.targetUserId ?: userUuid
@@ -60,6 +63,7 @@ class LocationController(
                     southWestLat = request.southWestLat!!,
                     southWestLon = request.southWestLon!!,
                     categoryId = request.categoryId,
+                    groupId = request.groupId,
                     pageable = pageable
                 )
             }
@@ -71,20 +75,28 @@ class LocationController(
                     longitude = request.longitude!!,
                     radiusMeters = request.radiusMeters!!,
                     categoryId = request.categoryId,
+                    groupId = request.groupId,
                     pageable = pageable
                 )
             }
-            // 3. 카테고리 검색
+            // 3. 그룹 검색
+            request.groupId != null -> {
+                locationApplicationService.getLocationsByUserAndGroup(targetUserId, request.groupId, pageable)
+            }
+            // 4. 카테고리 검색
             request.categoryId != null -> {
                 locationApplicationService.getLocationsByCategory(targetUserId, request.categoryId, pageable)
             }
-            // 4. 키워드 검색
+            // 5. 키워드 검색
             !request.keyword.isNullOrBlank() -> {
                 locationApplicationService.searchLocationsByKeyword(targetUserId, request.keyword, pageable)
             }
-            // 5. 기본: 최근 등록순
+            // 6. 기본: sortBy에 따라 정렬
             else -> {
-                locationApplicationService.getRecentLocations(targetUserId, pageable)
+                when (request.sortBy ?: LocationSortBy.CREATED_AT) {
+                    LocationSortBy.RATING -> locationApplicationService.getTopRatedLocations(targetUserId, pageable)
+                    LocationSortBy.CREATED_AT -> locationApplicationService.getRecentLocations(targetUserId, pageable)
+                }
             }
         }
 
@@ -97,7 +109,7 @@ class LocationController(
                 )
             } else null
 
-            LocationSummaryResponse.from(location, category, distance)
+            LocationResponse.from(location, category, distance)
         }
 
         val pageResponse = PageResponse(
@@ -130,8 +142,8 @@ class LocationController(
                 categoryId = request.categoryId,
                 coordinates = request.toCoordinates(),
                 iconUrl = request.iconUrl,
-                personalRating = request.personalRating,
-                personalReview = request.personalReview,
+                rating = request.rating,
+                review = request.review,
                 tags = request.tags,
                 groupId = request.groupId
             )
@@ -181,7 +193,19 @@ class LocationController(
         return ResponseEntity.ok(ApiResponse.success(response))
     }
 
-    @Operation(summary = "장소 기본 정보 수정", description = "장소의 기본 정보를 수정합니다.")
+    @Operation(
+        summary = "장소 정보 통합 수정",
+        description = """
+            장소의 모든 정보를 통합하여 수정합니다 (부분 업데이트 지원).
+            제공된 필드만 업데이트되며, null인 필드는 기존 값을 유지합니다.
+
+            수정 가능한 정보:
+            - 기본 정보: name, description, address, categoryId, iconUrl
+            - 평가 정보: rating, review, tags
+            - 그룹: groupId
+            - 좌표: coordinates (latitude, longitude는 함께 업데이트됨)
+        """
+    )
     @PutMapping("/{locationId}")
     fun updateLocation(
         @Parameter(description = "장소 ID", required = true)
@@ -197,7 +221,12 @@ class LocationController(
                 description = request.description,
                 address = request.address,
                 categoryId = request.categoryId,
-                iconUrl = request.iconUrl
+                iconUrl = request.iconUrl,
+                rating = request.rating,
+                review = request.review,
+                tags = request.tags,
+                groupId = request.groupId,
+                coordinates = request.coordinates?.toCoordinates()
             )
 
             val (location, category) = locationApplicationService.updateLocation(locationId, userUuid, command)
@@ -217,137 +246,6 @@ class LocationController(
             )
         } catch (e: Exception) {
             logger.error("Failed to update location: {}", locationId, e)
-            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                ApiResponse.error<LocationResponse>(
-                    com.kangpark.openspot.common.web.dto.ErrorResponse(
-                        code = "INTERNAL_SERVER_ERROR",
-                        message = "서버 오류가 발생했습니다"
-                    )
-                )
-            )
-        }
-    }
-
-    @Operation(summary = "개인 평가 정보 수정", description = "장소에 대한 개인 평점, 리뷰, 태그 등을 수정합니다.")
-    @PutMapping("/{locationId}/evaluation")
-    fun updateLocationEvaluation(
-        @Parameter(description = "장소 ID", required = true)
-        @PathVariable locationId: UUID,
-        @Valid @RequestBody request: UpdateLocationEvaluationRequest,
-        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
-        @RequestHeader("X-User-Id") userId: String
-    ): ResponseEntity<ApiResponse<LocationResponse>> {
-        val userUuid = UUID.fromString(userId)
-        return try {
-            val command = UpdateLocationEvaluationCommand(
-                personalRating = request.personalRating,
-                personalReview = request.personalReview,
-                tags = request.tags
-            )
-
-            val (location, category) = locationApplicationService.updateLocationEvaluation(locationId, userUuid, command)
-
-            val response = LocationResponse.from(location, category)
-            ResponseEntity.ok(ApiResponse.success(response))
-
-        } catch (e: IllegalArgumentException) {
-            logger.warn("Invalid evaluation update request: {}", e.message)
-            ResponseEntity.badRequest().body(
-                ApiResponse.error<LocationResponse>(
-                    com.kangpark.openspot.common.web.dto.ErrorResponse(
-                        code = "INVALID_REQUEST",
-                        message = e.message ?: "잘못된 요청입니다"
-                    )
-                )
-            )
-        } catch (e: Exception) {
-            logger.error("Failed to update evaluation: {}", locationId, e)
-            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                ApiResponse.error<LocationResponse>(
-                    com.kangpark.openspot.common.web.dto.ErrorResponse(
-                        code = "INTERNAL_SERVER_ERROR",
-                        message = "서버 오류가 발생했습니다"
-                    )
-                )
-            )
-        }
-    }
-
-    @Operation(summary = "장소 그룹 변경", description = "장소가 속한 그룹을 변경합니다.")
-    @PutMapping("/{locationId}/group")
-    fun changeLocationGroup(
-        @Parameter(description = "장소 ID", required = true)
-        @PathVariable locationId: UUID,
-        @Valid @RequestBody request: ChangeLocationGroupRequest,
-        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
-        @RequestHeader("X-User-Id") userId: String
-    ): ResponseEntity<ApiResponse<LocationResponse>> {
-        val userUuid = UUID.fromString(userId)
-        return try {
-            val (location, category) = locationApplicationService.changeLocationGroup(
-                locationId = locationId,
-                userId = userUuid,
-                groupId = request.groupId
-            )
-
-            val response = LocationResponse.from(location, category)
-            ResponseEntity.ok(ApiResponse.success(response))
-
-        } catch (e: IllegalArgumentException) {
-            logger.warn("Invalid group change request: {}", e.message)
-            ResponseEntity.badRequest().body(
-                ApiResponse.error<LocationResponse>(
-                    com.kangpark.openspot.common.web.dto.ErrorResponse(
-                        code = "INVALID_REQUEST",
-                        message = e.message ?: "잘못된 요청입니다"
-                    )
-                )
-            )
-        } catch (e: Exception) {
-            logger.error("Failed to change group: {}", locationId, e)
-            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                ApiResponse.error<LocationResponse>(
-                    com.kangpark.openspot.common.web.dto.ErrorResponse(
-                        code = "INTERNAL_SERVER_ERROR",
-                        message = "서버 오류가 발생했습니다"
-                    )
-                )
-            )
-        }
-    }
-
-    @Operation(summary = "장소 좌표 수정", description = "장소의 좌표를 수정합니다.")
-    @PutMapping("/{locationId}/coordinates")
-    fun updateLocationCoordinates(
-        @Parameter(description = "장소 ID", required = true)
-        @PathVariable locationId: UUID,
-        @Valid @RequestBody request: UpdateLocationCoordinatesRequest,
-        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
-        @RequestHeader("X-User-Id") userId: String
-    ): ResponseEntity<ApiResponse<LocationResponse>> {
-        val userUuid = UUID.fromString(userId)
-        return try {
-            val (location, category) = locationApplicationService.updateLocationCoordinates(
-                locationId = locationId,
-                userId = userUuid,
-                coordinates = request.toCoordinates()
-            )
-
-            val response = LocationResponse.from(location, category)
-            ResponseEntity.ok(ApiResponse.success(response))
-
-        } catch (e: IllegalArgumentException) {
-            logger.warn("Invalid coordinates update request: {}", e.message)
-            ResponseEntity.badRequest().body(
-                ApiResponse.error<LocationResponse>(
-                    com.kangpark.openspot.common.web.dto.ErrorResponse(
-                        code = "INVALID_REQUEST",
-                        message = e.message ?: "잘못된 요청입니다"
-                    )
-                )
-            )
-        } catch (e: Exception) {
-            logger.error("Failed to update location coordinates: {}", locationId, e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                 ApiResponse.error<LocationResponse>(
                     com.kangpark.openspot.common.web.dto.ErrorResponse(
@@ -401,97 +299,31 @@ class LocationController(
     }
 
 
-    @Operation(summary = "최고 평점 장소 목록", description = "내 개인 평점 기준 최고 평점 장소 목록을 조회합니다.")
-    @GetMapping("/top-rated")
-    fun getTopRatedLocations(
-        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
-        @RequestHeader("X-User-Id") userId: String,
-        @PageableDefault(size = 20) pageable: Pageable
-    ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val userUuid = UUID.fromString(userId)
-        val locationPage = locationApplicationService.getTopRatedLocations(userUuid, pageable)
-        val responseList = locationPage.content.map { (location, category) ->
-            LocationSummaryResponse.from(location, category)
-        }
-        val pageResponse = PageResponse(
-            content = responseList,
-            page = PageInfo(
-                number = locationPage.number,
-                size = locationPage.size,
-                totalElements = locationPage.totalElements,
-                totalPages = locationPage.totalPages,
-                first = locationPage.isFirst,
-                last = locationPage.isLast
-            )
-        )
-        return ResponseEntity.ok(ApiResponse.success(pageResponse))
-    }
-
-    @Operation(summary = "최근 등록 장소 목록", description = "최근 등록한 내 장소 목록을 조회합니다.")
-    @GetMapping("/recent")
-    fun getRecentLocations(
-        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
-        @RequestHeader("X-User-Id") userId: String,
-        @PageableDefault(size = 20) pageable: Pageable
-    ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val userUuid = UUID.fromString(userId)
-        val locationPage = locationApplicationService.getRecentLocations(userUuid, pageable)
-        val responseList = locationPage.content.map { (location, category) ->
-            LocationSummaryResponse.from(location, category)
-        }
-        val pageResponse = PageResponse(
-            content = responseList,
-            page = PageInfo(
-                number = locationPage.number,
-                size = locationPage.size,
-                totalElements = locationPage.totalElements,
-                totalPages = locationPage.totalPages,
-                first = locationPage.isFirst,
-                last = locationPage.isLast
-            )
-        )
-        return ResponseEntity.ok(ApiResponse.success(pageResponse))
-    }
-
-    @Operation(summary = "내 장소 목록", description = "내가 생성한 모든 장소 목록을 조회합니다.")
+    @Operation(
+        summary = "내 장소 목록 (일반 사용자용)",
+        description = """
+            내가 생성한 모든 장소 목록을 조회합니다.
+            - sortBy: 정렬 기준 (RATING: 평점순, CREATED_AT: 최근 등록순, 기본값: CREATED_AT)
+            - 본인의 장소만 조회 가능 (X-User-Id 자동 사용)
+        """
+    )
     @GetMapping("/self")
     fun getMyLocations(
+        @Parameter(description = "정렬 기준", required = false)
+        @RequestParam(required = false) sortBy: LocationSortBy?,
         @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
         @RequestHeader("X-User-Id") userId: String,
         @PageableDefault(size = 20) pageable: Pageable
-    ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
+    ): ResponseEntity<ApiResponse<PageResponse<LocationResponse>>> {
         val userUuid = UUID.fromString(userId)
-        val locationPage = locationApplicationService.getLocationsByUser(userUuid, pageable)
-        val responseList = locationPage.content.map { (location, category) ->
-            LocationSummaryResponse.from(location, category)
-        }
-        val pageResponse = PageResponse(
-            content = responseList,
-            page = PageInfo(
-                number = locationPage.number,
-                size = locationPage.size,
-                totalElements = locationPage.totalElements,
-                totalPages = locationPage.totalPages,
-                first = locationPage.isFirst,
-                last = locationPage.isLast
-            )
-        )
-        return ResponseEntity.ok(ApiResponse.success(pageResponse))
-    }
 
-    @Operation(summary = "그룹별 장소 목록", description = "특정 그룹에 속한 내 장소 목록을 조회합니다.")
-    @GetMapping("/groups/{groupId}")
-    fun getLocationsByGroup(
-        @Parameter(description = "그룹 ID (null이면 그룹 미지정 장소)")
-        @PathVariable(required = false) groupId: UUID?,
-        @Parameter(description = "JWT 토큰 (자동 주입)", hidden = true)
-        @RequestHeader("X-User-Id") userId: String,
-        @PageableDefault(size = 20) pageable: Pageable
-    ): ResponseEntity<ApiResponse<PageResponse<LocationSummaryResponse>>> {
-        val userUuid = UUID.fromString(userId)
-        val locationPage = locationApplicationService.getLocationsByUserAndGroup(userUuid, groupId, pageable)
+        val locationPage = when (sortBy ?: LocationSortBy.CREATED_AT) {
+            LocationSortBy.RATING -> locationApplicationService.getTopRatedLocations(userUuid, pageable)
+            LocationSortBy.CREATED_AT -> locationApplicationService.getRecentLocations(userUuid, pageable)
+        }
+
         val responseList = locationPage.content.map { (location, category) ->
-            LocationSummaryResponse.from(location, category)
+            LocationResponse.from(location, category)
         }
         val pageResponse = PageResponse(
             content = responseList,

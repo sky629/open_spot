@@ -44,16 +44,20 @@ class CreateLocationUseCase(
             categoryId = command.categoryId,
             coordinates = command.coordinates,
             iconUrl = command.iconUrl,
-            personalRating = command.personalRating,
-            personalReview = command.personalReview,
+            rating = command.rating,
+            review = command.review,
             tags = command.tags,
             groupId = command.groupId
         )
 
         val savedLocation = locationRepository.save(location)
 
-        // 장소 생성 이벤트 발행
-        locationEventPublisher.publishLocationCreated(savedLocation)
+//        try {
+//            // 장소 생성 이벤트 발행
+//            locationEventPublisher.publishLocationCreated(savedLocation)
+//        } catch (e: Exception) {
+//            logger.error("Failed to publish event. create location", e)
+//        }
 
         logger.info("Location created successfully: id={}", savedLocation.id)
         return savedLocation

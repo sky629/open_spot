@@ -13,8 +13,8 @@ data class CreateLocationCommand(
     val categoryId: UUID,
     val coordinates: Coordinates,
     val iconUrl: String? = null,
-    val personalRating: Int? = null,
-    val personalReview: String? = null,
+    val rating: Double? = null,
+    val review: String? = null,
     val tags: List<String> = emptyList(),
     val groupId: UUID? = null
 )
