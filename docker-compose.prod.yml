@@ -73,7 +73,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 40s
+      start_period: 60s
 
   gateway-service:
     build:
@@ -90,12 +90,15 @@ services:
       - openspot-network
     environment:
       - SPRING_CLOUD_CONFIG_URI=http://config-service:9999
+      - SPRING_CLOUD_CONFIG_FAIL_FAST=false
+      - SPRING_CLOUD_CONFIG_RETRY_MAXATTEMPTS=20
+      - SPRING_CLOUD_CONFIG_RETRY_INITIALINTERVAL=2000
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 40s
+      start_period: 60s
 
   auth-service:
     build:
@@ -106,16 +109,21 @@ services:
     ports:
       - "8081:8081"
     depends_on:
+      config-service:
+        condition: service_healthy
+      gateway-service:
+        condition: service_healthy
       postgresql:
         condition: service_started
       redis:
         condition: service_started
-      gateway-service:
-        condition: service_healthy
     networks:
       - openspot-network
     environment:
       - SPRING_CLOUD_CONFIG_URI=http://config-service:9999
+      - SPRING_CLOUD_CONFIG_FAIL_FAST=false
+      - SPRING_CLOUD_CONFIG_RETRY_MAXATTEMPTS=20
+      - SPRING_CLOUD_CONFIG_RETRY_INITIALINTERVAL=2000
       - POSTGRES_HOST=postgresql
       - REDIS_HOST=redis
     healthcheck:
@@ -123,7 +131,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 90s
 
   location-service:
     build:
@@ -134,16 +142,21 @@ services:
     ports:
       - "8082:8082"
     depends_on:
+      config-service:
+        condition: service_healthy
+      gateway-service:
+        condition: service_healthy
       postgresql:
         condition: service_started
       redis:
         condition: service_started
-      gateway-service:
-        condition: service_healthy
     networks:
       - openspot-network
     environment:
       - SPRING_CLOUD_CONFIG_URI=http://config-service:9999
+      - SPRING_CLOUD_CONFIG_FAIL_FAST=false
+      - SPRING_CLOUD_CONFIG_RETRY_MAXATTEMPTS=20
+      - SPRING_CLOUD_CONFIG_RETRY_INITIALINTERVAL=2000
       - POSTGRES_HOST=postgresql
       - REDIS_HOST=redis
     healthcheck:
@@ -151,7 +164,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 90s
 
   notification-service:
     build:
@@ -162,16 +175,21 @@ services:
     ports:
       - "8083:8083"
     depends_on:
+      config-service:
+        condition: service_healthy
+      gateway-service:
+        condition: service_healthy
       postgresql:
         condition: service_started
       kafka:
         condition: service_started
-      gateway-service:
-        condition: service_healthy
     networks:
       - openspot-network
     environment:
       - SPRING_CLOUD_CONFIG_URI=http://config-service:9999
+      - SPRING_CLOUD_CONFIG_FAIL_FAST=false
+      - SPRING_CLOUD_CONFIG_RETRY_MAXATTEMPTS=20
+      - SPRING_CLOUD_CONFIG_RETRY_INITIALINTERVAL=2000
       - POSTGRES_HOST=postgresql
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     healthcheck:
@@ -179,7 +197,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 90s
 
 volumes:
   postgresql_data:

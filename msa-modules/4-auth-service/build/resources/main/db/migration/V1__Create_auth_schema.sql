@@ -34,15 +34,15 @@ CREATE TABLE auth.social_accounts (
     
     CONSTRAINT fk_social_accounts_user_id 
         FOREIGN KEY (user_id) 
-        REFERENCES auth.users(id) 
+        REFERENCES auth.users(id)
         ON DELETE CASCADE,
-    
+
     -- 한 사용자는 동일 제공자에 하나의 계정만 연결 가능
-    CONSTRAINT uk_social_accounts_user_provider 
+    CONSTRAINT uk_social_accounts_user_provider
         UNIQUE (user_id, provider),
-    
+
     -- 동일 제공자의 동일 계정은 한 번만 연결 가능
-    CONSTRAINT uk_social_accounts_provider_id 
+    CONSTRAINT uk_social_accounts_provider_id
         UNIQUE (provider, provider_id)
 );
 
@@ -63,15 +63,15 @@ END;
 $$ language 'plpgsql';
 
 -- users 테이블에 updated_at 자동 업데이트 트리거 추가
-CREATE TRIGGER update_users_updated_at 
-    BEFORE UPDATE ON auth.users 
-    FOR EACH ROW 
+CREATE TRIGGER update_users_updated_at
+    BEFORE UPDATE ON auth.users
+    FOR EACH ROW
     EXECUTE FUNCTION auth.update_updated_at_column();
 
 -- social_accounts 테이블에 updated_at 자동 업데이트 트리거 추가
-CREATE TRIGGER update_social_accounts_updated_at 
-    BEFORE UPDATE ON auth.social_accounts 
-    FOR EACH ROW 
+CREATE TRIGGER update_social_accounts_updated_at
+    BEFORE UPDATE ON auth.social_accounts
+    FOR EACH ROW
     EXECUTE FUNCTION auth.update_updated_at_column();
 
 -- 테이블에 대한 코멘트 추가

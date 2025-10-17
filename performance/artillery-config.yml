@@ -1,0 +1,132 @@
+# ==============================================================================
+# Artillery Performance Test Configuration for Open-Spot
+#
+# Usage:
+#   npm install -g artillery
+#   artillery run performance/artillery-config.yml
+#   artillery run performance/artillery-config.yml --output report.json
+#   artillery report report.json --output report.html
+# ==============================================================================
+
+config:
+  target: "http://localhost:8080"
+  phases:
+    # Warm-up phase
+    - duration: 30
+      arrivalRate: 5
+      name: "Warm-up"
+
+    # Ramp-up phase
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 50
+      name: "Ramp-up to 50 users/sec"
+
+    # Sustained load phase
+    - duration: 120
+      arrivalRate: 50
+      name: "Sustained load (50 users/sec)"
+
+    # Peak load phase
+    - duration: 60
+      arrivalRate: 50
+      rampTo: 100
+      name: "Peak load (100 users/sec)"
+
+    # Cool-down phase
+    - duration: 30
+      arrivalRate: 10
+      name: "Cool-down"
+
+  # Performance thresholds
+  ensure:
+    maxErrorRate: 1  # Max 1% error rate
+    p95: 500         # 95th percentile response time < 500ms
+    p99: 1000        # 99th percentile response time < 1000ms
+
+  # HTTP settings
+  http:
+    timeout: 10
+    pool: 50  # Connection pool size
+
+  # Variables
+  variables:
+    baseUrl: "http://localhost:8080"
+
+  # Plugins
+  plugins:
+    metrics-by-endpoint:
+      stripQueryString: true
+
+scenarios:
+  # ===========================================================================
+  # Scenario 1: Public API (No Auth)
+  # ===========================================================================
+  - name: "Public API - Categories List"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/v1/categories"
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+  # ===========================================================================
+  # Scenario 2: Health Checks
+  # ===========================================================================
+  - name: "Health Checks"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/v1/auth/health"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/api/v1/locations/health"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/api/v1/notifications/health"
+          expect:
+            - statusCode: 200
+
+  # ===========================================================================
+  # Scenario 3: Search Locations (Simulated)
+  # ===========================================================================
+  - name: "Search Locations by Bounds"
+    weight: 40
+    flow:
+      - get:
+          url: "/api/v1/locations?northEastLat=37.6&northEastLon=127.1&southWestLat=37.4&southWestLon=126.9&page=0&size=20"
+          # Note: This requires authentication in actual implementation
+          # For load testing without auth, you may need to temporarily allow public access
+          # or use a test token
+          beforeRequest: "setAuthHeader"
+          expect:
+            - statusCode:
+                - 200
+                - 401  # May return 401 if not authenticated
+
+  # ===========================================================================
+  # Scenario 4: Mixed Load (Read-heavy)
+  # ===========================================================================
+  - name: "Mixed Load"
+    weight: 20
+    flow:
+      # Check categories
+      - get:
+          url: "/api/v1/categories"
+
+      # Simulate think time (user reading)
+      - think: 2
+
+      # Check health
+      - get:
+          url: "/api/v1/locations/health"
+
+# ==============================================================================
+# Before Request Hook (for adding auth headers)
+# ==============================================================================
+processor: "./artillery-processor.js"

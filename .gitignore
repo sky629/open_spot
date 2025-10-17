@@ -98,3 +98,43 @@ replay_pid*
 
 # Kotlin Gradle plugin data
 .kotlin/
+
+# ==============================================================================
+# DevOps & Deployment
+# ==============================================================================
+
+# Docker
+*.tar
+.dockerignore.swp
+
+# Secrets & Credentials
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.keystore
+
+# Performance test reports
+performance/reports/
+*.har
+
+# Monitoring data
+monitoring/data/
+prometheus_data/
+grafana_data/
+loki_data/
+
+# Backup files
+backup/
+*.sql
+*.dump
+*.bak
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+*~
