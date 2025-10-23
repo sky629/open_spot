@@ -183,7 +183,7 @@ gatewayService:
   service:
     port: 8080
     targetPort: 8080
-    type: LoadBalancer
+    type: ClusterIP
 
   env:
     SPRING_CLOUD_CONFIG_URI: "http://config-service:9999"
@@ -282,6 +282,7 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-set-headers: "true"
 
   hosts:
     - host: openspot.local
