@@ -160,7 +160,7 @@ minikube dashboard -p openspot
 ### 6. 클러스터 정리 및 삭제
 
 ```bash
-./5-cleanup.sh
+./7-cleanup.sh
 ```
 
 ## 리소스 할당

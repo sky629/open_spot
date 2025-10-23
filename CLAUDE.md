@@ -103,7 +103,7 @@ curl http://localhost:8080/api/v1/auth/health
 curl http://localhost:8080/api/v1/locations/health
 
 # 6. Cleanup (delete cluster)
-./5-cleanup.sh
+./7-cleanup.sh
 ```
 
 ### Cloudflare 프로덕션 배포 (Minikube LoadBalancer + 공인 IP)

@@ -121,7 +121,7 @@ curl https://api.openspot.kang-labs.com/api/v1/auth/health
 
 #### 클러스터 정리
 ```bash
-./5-cleanup.sh
+./7-cleanup.sh
 ```
 
 ### 각 스크립트가 실행하는 내용
