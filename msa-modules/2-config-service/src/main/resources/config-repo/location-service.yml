@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:openspot}
+    url: jdbc:postgresql://${POSTGRES_HOST:postgresql}:${POSTGRES_PORT:5432}/${POSTGRES_DB:openspot}
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
@@ -23,7 +23,7 @@ spring:
     default-schema: location
     
   redis:
-    host: ${REDIS_HOST:localhost}
+    host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
     timeout: 3000ms
     lettuce:
@@ -31,9 +31,10 @@ spring:
         max-active: 8
         max-idle: 8
         min-idle: 0
+      shutdown-timeout: 2000ms
         
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -48,6 +49,13 @@ management:
     web:
       exposure:
         include: health, info, refresh
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    redis:
+      enabled: false  # Redis 헬스 체크 비활성화 (헬스 체크에서 제외)
 
 resilience4j:
   circuitbreaker:

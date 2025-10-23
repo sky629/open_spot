@@ -43,9 +43,10 @@ EXPOSE 8081
 # JVM 최적화 옵션과 함께 실행
 # - UseContainerSupport: 컨테이너 환경 인식
 # - MaxRAMPercentage: 컨테이너 메모리의 75%까지 사용
-# - Spring Profile: 환경변수로 주입 (기본값: prod)
+# - Spring Profile: 환경변수로 주입 (기본값: default)
+ENV SPRING_PROFILES_ACTIVE=default
+
 ENTRYPOINT ["java", \
     "-XX:+UseContainerSupport", \
     "-XX:MaxRAMPercentage=75.0", \
-    "-Dspring.profiles.active=${SPRING_PROFILES_ACTIVE:-prod}", \
     "-jar", "app.jar"]

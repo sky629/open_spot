@@ -2,7 +2,7 @@ spring:
   application:
     name: notification-service
   config:
-    import: "configserver:http://localhost:9999"
+    import: "configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:9999}"
 
 server:
   port: 8083

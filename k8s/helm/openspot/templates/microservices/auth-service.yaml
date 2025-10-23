@@ -1,0 +1,92 @@
+{{- if .Values.authService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.authService.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.authService.name }}
+    {{- include "openspot.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.authService.service.type }}
+  ports:
+    - port: {{ .Values.authService.service.port }}
+      targetPort: {{ .Values.authService.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.authService.name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.authService.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.authService.name }}
+    {{- include "openspot.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.authService.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.authService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.authService.name }}
+    spec:
+      initContainers:
+        - name: wait-for-gateway-service
+          image: busybox:1.36
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for Gateway Service..."
+              until nc -z gateway-service 8080; do echo "Waiting for Gateway Service at :8080..."; sleep 2; done
+              echo "Gateway Service is ready!"
+      containers:
+        - name: {{ .Values.authService.name }}
+          image: {{ include "openspot.image" (dict "image" .Values.authService.image "Values" .Values) }}
+          imagePullPolicy: {{ include "openspot.imagePullPolicy" . }}
+          args:
+            - "--spring.cloud.config.uri={{ .Values.authService.env.SPRING_CLOUD_CONFIG_URI }}"
+            - "--spring.config.import=configserver:{{ .Values.authService.env.SPRING_CLOUD_CONFIG_URI }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.authService.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: {{ .Values.authService.env.SPRING_CLOUD_CONFIG_URI | quote }}
+            - name: SPRING_CONFIG_IMPORT
+              value: "configserver:{{ .Values.authService.env.SPRING_CLOUD_CONFIG_URI }}"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dspring.cloud.config.uri={{ .Values.authService.env.SPRING_CLOUD_CONFIG_URI }} -Dspring.config.import=configserver:{{ .Values.authService.env.SPRING_CLOUD_CONFIG_URI }}"
+            - name: POSTGRES_HOST
+              value: {{ .Values.authService.env.POSTGRES_HOST | quote }}
+            - name: REDIS_HOST
+              value: {{ .Values.authService.env.REDIS_HOST | quote }}
+          envFrom:
+            - configMapRef:
+                name: openspot-config
+            - secretRef:
+                name: openspot-secrets
+          resources:
+            {{- toYaml .Values.authService.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 180
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+{{- end }}

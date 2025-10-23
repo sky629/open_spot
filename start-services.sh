@@ -64,11 +64,13 @@ echo "🔐 Starting Auth Service..."
 ./gradlew :auth-service:bootRun --quiet > logs/auth-service.log 2>&1 &
 AUTH_PID=$!
 echo "   Auth Service PID: $AUTH_PID"
+sleep 2  # Prevent Gradle daemon conflicts
 
 echo "📊 Starting Location Service..."
 ./gradlew :location-service:bootRun --quiet > logs/location-service.log 2>&1 &
 LOCATION_PID=$!
 echo "   Location Service PID: $LOCATION_PID"
+sleep 2  # Prevent Gradle daemon conflicts
 
 echo "🔔 Starting Notification Service..."
 ./gradlew :notification-service:bootRun --quiet > logs/notification-service.log 2>&1 &

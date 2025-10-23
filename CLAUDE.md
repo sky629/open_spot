@@ -60,16 +60,18 @@ cp .env.example .env
 # - JWT_SECRET: Secret key for JWT signing
 ```
 
-### Quick Start
+### Local Development (Docker Compose)
 ```bash
-# Start infrastructure + config + gateway
+# 1. Start infrastructure + config + gateway (최초 실행)
 ./start-infrastructure.sh
 
-# Start domain services
+# 2. Start domain services
 ./start-services.sh
 
-# Stop everything
-./stop-all.sh
+# 서비스 중지
+./stop-services.sh          # 도메인 서비스만 중지 (Docker 유지)
+./stop-infrastructure.sh    # Config + Gateway만 중지
+./stop-all.sh              # 모든 서비스 + Docker 중지
 
 # View service logs
 tail -f logs/config-service.log
@@ -77,6 +79,85 @@ tail -f logs/gateway-service.log
 tail -f logs/auth-service.log
 tail -f logs/location-service.log
 tail -f logs/notification-service.log
+```
+
+### Kubernetes Deployment (Minikube + LoadBalancer)
+```bash
+# 1. Create Minikube cluster
+cd k8s/scripts
+./2-create-cluster.sh
+
+# 2. Build Docker images
+./3-build-images.sh
+
+# 3. Deploy with Helm (Gateway는 자동으로 LoadBalancer 타입)
+./4-deploy.sh
+
+# 4. Check deployment status
+kubectl get pods -n openspot
+kubectl get svc gateway-service -n openspot
+# Gateway에 EXTERNAL-IP가 할당됨 (보통 127.0.0.1)
+
+# 5. Test via LoadBalancer (localhost:8080)
+curl http://localhost:8080/api/v1/auth/health
+curl http://localhost:8080/api/v1/locations/health
+
+# 6. Cleanup (delete cluster)
+./5-cleanup.sh
+```
+
+### Cloudflare 프로덕션 배포 (Minikube LoadBalancer + 공인 IP)
+
+**목표**: `https://api.openspot.kang-labs.com`을 내 컴퓨터의 Kubernetes Gateway로 연결
+
+```bash
+# 1. Minikube 클러스터 및 Helm 배포 완료
+# (위의 1-4 단계 실행)
+
+# 2. Gateway LoadBalancer 확인
+kubectl get svc gateway-service -n openspot
+# EXTERNAL-IP: 127.0.0.1 (또는 Minikube IP)
+# PORT: 8080:xxxxx/TCP
+
+# 3. 로컬 테스트
+curl http://localhost:8080/api/v1/auth/health
+
+# 4. Cloudflare DNS 설정
+# 콘솔에 로그인 → DNS 설정:
+# - Type: A
+# - Name: api.openspot
+# - Content: <your-public-ip>  (예: 203.0.113.42)
+# - Proxy: OFF (회색 구름)
+# - TTL: Auto
+
+# 5. 공유기 포트포워딩 설정
+# - 프로토콜: TCP
+# - 외부 포트: 443 (HTTPS)
+# - 내부 호스트: 컴퓨터 IP (예: 192.168.1.100)
+# - 내부 포트: 8080
+
+# 6. 외부 테스트
+curl https://api.openspot.kang-labs.com/api/v1/auth/health
+
+# 7. 프론트엔드 API 호출
+# 프론트엔드 (openspot.kang-labs.com)에서:
+# const API_BASE_URL = 'https://api.openspot.kang-labs.com';
+# fetch(`${API_BASE_URL}/api/v1/auth/login`, {...})
+```
+
+**흐름도**:
+```
+브라우저/프론트엔드
+    ↓ https://api.openspot.kang-labs.com
+Cloudflare DNS (A 레코드)
+    ↓ 203.0.113.42 (공인 IP)
+공유기 포트포워딩 (443 → 컴퓨터:8080)
+    ↓ http://localhost:8080
+Minikube LoadBalancer (gateway-service)
+    ↓
+Spring Cloud Gateway (8080)
+    ↓
+Auth/Location/Notification Services
 ```
 
 ### Individual Service Development
@@ -510,9 +591,52 @@ fun handleLocationEvent(event: LocationEvent)
 - **Location tables**: `locations`, `categories`, `location_groups`
 - **Notification tables**: `notifications`, `device_tokens`, `notification_settings`
 
-### Spatial Queries (PostGIS)
+### Query Implementation Strategy
+
+#### 1. **KotlinJDSL** - 타입 안전 JPQL DSL (권장)
+```kotlin
+// 키워드 검색 (LIKE)
+val location = Entities.entity(LocationJpaEntity::class)
+jpqlExecutor.createQuery(LocationJpaEntity::class) {
+    select(location)
+    from(location)
+    where(
+        and(
+            location.userId eq userId,
+            location.isActive eq true,
+            or(
+                lower(location.name) like keyword.lowercase(),
+                lower(location.description) like keyword.lowercase(),
+                lower(location.address) like keyword.lowercase()
+            )
+        )
+    )
+    orderBy(location.createdAt.desc())
+}
+
+// 집계 쿼리 (GROUP BY)
+jpqlExecutor.createQuery(LocationJpaEntity::class) {
+    selectMulti(location.categoryId, count(location))
+    from(location)
+    where(and(location.userId eq userId, location.isActive eq true))
+    groupBy(location.categoryId)
+}
+```
+
+**KotlinJDSL 사용 메서드**:
+- `findByUserIdAndKeyword`: LIKE 검색 (여러 필드)
+- `countByUserIdGroupByCategory`: GROUP BY + COUNT 집계
+
+**장점**:
+- ✅ 타입 안정성: 컴파일 타임에 필드명 오류 검출
+- ✅ IDE 지원: 자동완성, 리팩토링 (필드명 변경 시 자동 반영)
+- ✅ 가독성: SQL 문자열보다 Kotlin DSL이 더 읽기 쉬움
+- ✅ 안정성: 동적 쿼리 생성 시 조건 누락 방지
+
+#### 2. **Native Query** - PostGIS 공간 함수 (필요시만)
 ```sql
 -- Find locations within radius (Location Service)
+-- PostGIS Native Query (KotlinJDSL 미지원)
 SELECT * FROM location.locations l
 WHERE l.is_active = true
 AND ST_DWithin(
@@ -525,6 +649,15 @@ ORDER BY ST_Distance(
     ST_SetSRID(ST_MakePoint(?longitude, ?latitude), 4326)::geography
 );
 ```
+
+**Native Query 사용 메서드**:
+- `findByCoordinatesWithinRadiusDynamic`: 반경 검색 (ST_DWithin)
+- `findByCoordinatesWithinBoundsDynamic`: 범위 검색 (ST_Contains)
+
+**이유**:
+- ⚠️ PostGIS 함수는 일반 JPQL에서 지원되지 않음
+- ⚠️ 지리 좌표계 변환 (4326) 필요
+- ⚠️ KotlinJDSL은 JPQL 표준만 지원
 
 ### Configuration Management
 ```yaml
@@ -682,6 +815,70 @@ testImplementation("org.testcontainers:kafka")         // Notification Service
 - **Swagger 의존성 누락**: `springdoc-openapi-starter-webmvc-ui:2.5.0` 의존성 확인
 - **Clean Architecture 위반**: 레이어 간 의존성 방향 준수 (Domain ← Application ← Infrastructure)
 - **Entity 변환 오류**: Domain ↔ JPA Entity 변환 시 BaseEntity 필드 처리 확인
+
+#### KotlinJDSL 마이그레이션 (Location Service)
+쿼리 구현 전략: **하이브리드 접근** (KotlinJDSL + Native Query)
+
+**KotlinJDSL 사용 메서드** (타입 안전 JPQL DSL):
+```kotlin
+// 1. 키워드 검색 (여러 필드 LIKE)
+override fun findByUserIdAndKeyword(userId: UUID, keyword: String, pageable: Pageable): Page<LocationJpaEntity> {
+    return jpqlExecutor.findPage(pageable) {
+        select(entity(LocationJpaEntity::class))
+        from(entity(LocationJpaEntity::class))
+        where(buildKeywordPredicate(userId, keyword))
+        orderBy(path(LocationJpaEntity::createdAt).desc())
+    }
+}
+
+// 2. 집계 쿼리 (GROUP BY + COUNT)
+override fun countByUserIdGroupByCategory(userId: UUID): Map<UUID, Long> {
+    val results = jpqlExecutor.createQuery(Array::class) {
+        select(
+            path(LocationJpaEntity::categoryId),
+            Expression.count(entity(LocationJpaEntity::class))
+        )
+        from(entity(LocationJpaEntity::class))
+        where(...)
+        groupBy(path(LocationJpaEntity::categoryId))
+    }.resultList
+}
+```
+
+**KotlinJDSL 설정**:
+- Configuration: `KotlinJdslConfiguration.kt`
+  - `JpqlRenderContext` 빈 (쿼리 렌더링)
+  - `KotlinJdslJpqlExecutor` 빈 (쿼리 실행)
+- Dependencies:
+  ```kotlin
+  implementation("com.linecorp.kotlin-jdsl:jpql-dsl:3.5.0")
+  implementation("com.linecorp.kotlin-jdsl:jpql-render:3.5.0")
+  implementation("com.linecorp.kotlin-jdsl:spring-data-jpa-support:3.5.0")
+  ```
+
+**Native Query 유지** (PostGIS 공간 함수):
+- `findByCoordinatesWithinRadiusDynamic`: ST_DWithin (반경 검색)
+- `findByCoordinatesWithinBoundsDynamic`: ST_Contains (범위 검색)
+- 이유: PostGIS 함수는 일반 JPQL 미지원
+
+**KotlinJDSL 장점**:
+- ✅ 타입 안정성: 컴파일 타임에 필드명 오류 검출
+- ✅ IDE 지원: 자동완성, 리팩토링 (필드명 변경 시 자동 반영)
+- ✅ 가독성: DSL이 SQL 문자열보다 명확함
+- ✅ 안전성: 동적 조건 구성 시 타입 검증
+- ✅ 성능: SQL로 변환되어 네이티브 쿼리와 동일
+
+#### Kubernetes Issues
+- **Redis Health Check 실패**: auth-service, location-service에서 Redis 헬스 체크 비활성화됨
+  - 설정: `management.health.redis.enabled: false` in config YAML
+- **Gateway 라우팅 실패**: 서비스 호스트/포트 환경 변수 미설정
+  - 해결: ConfigMap에 `AUTH_SERVICE_HOST`, `LOCATION_SERVICE_HOST` 등 추가
+  - 값: Kubernetes 서비스 DNS 이름 (예: `auth-service:8081`)
+- **Pod Ready 타임아웃**: 서비스 시작 시간이 오래 걸림 (Config Service 로드)
+  - 해결: Helm values.yaml에서 `initialDelaySeconds` 증가
+  - 권장값: Config Service (90s), Domain Services (120s)
+- **Ingress 포트 80 응답 안 함**: Kubernetes 클러스터 내부 네트워크 문제
+  - 대안: `kubectl port-forward` 또는 NodePort 직접 접근 사용
 
 ### Service Dependencies
 Services must start in order:

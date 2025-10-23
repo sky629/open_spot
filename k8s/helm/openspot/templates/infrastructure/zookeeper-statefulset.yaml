@@ -1,0 +1,97 @@
+{{- if .Values.zookeeper.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: zookeeper
+    {{- include "openspot.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: {{ .Values.zookeeper.service.port }}
+      targetPort: 2181
+      protocol: TCP
+      name: client
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    app: zookeeper
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: zookeeper
+    {{- include "openspot.labels" . | nindent 4 }}
+spec:
+  serviceName: zookeeper
+  replicas: {{ .Values.zookeeper.replicas }}
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      containers:
+        - name: zookeeper
+          image: {{ .Values.zookeeper.image }}
+          imagePullPolicy: {{ include "openspot.imagePullPolicy" . }}
+          ports:
+            - containerPort: 2181
+              name: client
+            - containerPort: 2888
+              name: server
+            - containerPort: 3888
+              name: leader-election
+          env:
+            - name: ZOOKEEPER_CLIENT_PORT
+              value: {{ .Values.zookeeper.env.ZOOKEEPER_CLIENT_PORT | quote }}
+            - name: ZOOKEEPER_TICK_TIME
+              value: {{ .Values.zookeeper.env.ZOOKEEPER_TICK_TIME | quote }}
+          volumeMounts:
+            - name: zookeeper-data
+              mountPath: /var/lib/zookeeper/data
+            - name: zookeeper-log
+              mountPath: /var/lib/zookeeper/log
+          resources:
+            {{- toYaml .Values.zookeeper.resources | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: 2181
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 10
+          readinessProbe:
+            tcpSocket:
+              port: 2181
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: zookeeper-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        {{- if .Values.zookeeper.persistence.storageClass }}
+        storageClassName: {{ .Values.zookeeper.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.zookeeper.persistence.size }}
+    - metadata:
+        name: zookeeper-log
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        {{- if .Values.zookeeper.persistence.storageClass }}
+        storageClassName: {{ .Values.zookeeper.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: 1Gi
+{{- end }}

@@ -35,28 +35,114 @@
 
 ## 🚀 실행 방법
 
-### 1. 인프라 서비스 시작
-```bash
-./start-infrastructure.sh
-```
-이 명령어는 다음을 실행합니다:
-- Docker Compose (PostgreSQL, Redis, Kafka)
-- Config Service (9999)
-- Gateway Service (8080)
+### 로컬 개발 환경 (Docker Compose)
 
-### 2. 도메인 서비스 시작
+#### 최초 실행
 ```bash
+# 1. 환경 설정
+cp .env.example .env
+# .env 파일에서 GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET 설정
+
+# 2. 인프라 + Config + Gateway 시작
+./start-infrastructure.sh
+
+# 3. 도메인 서비스 시작
 ./start-services.sh
 ```
-이 명령어는 다음을 실행합니다:
-- Auth Service (8081)
-- Location Service (8082)
-- Notification Service (8083)
 
-### 3. 전체 서비스 종료
+#### 서비스 중지
 ```bash
-./stop-all.sh
+./stop-services.sh          # 도메인 서비스만 중지 (Docker 유지)
+./stop-infrastructure.sh    # Config + Gateway만 중지 (Docker 유지)
+./stop-all.sh              # 전체 중지 (Docker 포함)
 ```
+
+### Kubernetes 배포 (프로덕션)
+
+#### 배포 준비
+```bash
+# 1. .env 파일에 필수 변수 설정
+cp .env.example .env
+# 필수: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET
+
+# 2. k8s/scripts 디렉토리로 이동
+cd k8s/scripts
+
+# 3. 필요한 도구 설치 (최초 1회)
+./1-install-tools.sh
+
+# 4. Kubernetes 클러스터 생성
+./2-create-cluster.sh
+
+# 5. Docker 이미지 빌드
+./3-build-images.sh
+
+# 6. Helm으로 배포
+./4-deploy.sh
+```
+
+#### 배포 후 확인
+```bash
+# Pod 상태 확인
+kubectl get pods -n openspot
+
+# Gateway LoadBalancer 확인 (자동으로 EXTERNAL-IP 할당)
+kubectl get svc gateway-service -n openspot
+# NAME              TYPE           EXTERNAL-IP   PORT(S)
+# gateway-service   LoadBalancer   127.0.0.1     8080:xxxxx/TCP
+
+# 로그 확인
+kubectl logs -f deployment/auth-service -n openspot
+```
+
+#### 로컬 테스트 (LoadBalancer)
+```bash
+# Gateway에 직접 접근 (별도 설정 불필요)
+curl http://localhost:8080/api/v1/auth/health
+curl http://localhost:8080/api/v1/locations/health
+```
+
+#### Cloudflare 도메인 연동
+```bash
+# 1. Cloudflare DNS 설정
+# - Type: A
+# - Name: api.openspot
+# - Content: <your-public-ip>
+# - Proxy: OFF (회색 구름)
+
+# 2. 공유기 포트포워딩
+# - 외부: 443 → 내부: 컴퓨터-IP:8080
+
+# 3. 테스트
+curl https://api.openspot.kang-labs.com/api/v1/auth/health
+```
+
+자세한 내용: [k8s/README.md](./k8s/README.md#5-외부-접근-설정-및-테스트)
+
+#### 클러스터 정리
+```bash
+./5-cleanup.sh
+```
+
+### 각 스크립트가 실행하는 내용
+
+**로컬 개발 (Docker Compose)**
+- **start-infrastructure.sh**
+  - Docker Compose (PostgreSQL, Redis, Kafka, Zookeeper)
+  - Config Service (9999)
+  - Gateway Service (8080)
+
+- **start-services.sh**
+  - Auth Service (8081)
+  - Location Service (8082)
+  - Notification Service (8083)
+
+**Kubernetes 배포 (Minikube + LoadBalancer)**
+- **1-install-tools.sh**: kubectl, Helm, Minikube 설치
+- **2-create-cluster.sh**: Minikube 로컬 클러스터 생성
+- **3-build-images.sh**: 모든 서비스 Docker 이미지 빌드
+- **4-deploy.sh**: Helm으로 전체 애플리케이션 배포 (Gateway = LoadBalancer)
+- **5-cleanup.sh**: Kubernetes 리소스 정리 및 클러스터 삭제
 
 ## 🔍 헬스 체크
 

@@ -1,0 +1,94 @@
+{{- if .Values.locationService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.locationService.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.locationService.name }}
+    {{- include "openspot.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.locationService.service.type }}
+  ports:
+    - port: {{ .Values.locationService.service.port }}
+      targetPort: {{ .Values.locationService.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.locationService.name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.locationService.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.locationService.name }}
+    {{- include "openspot.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.locationService.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.locationService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.locationService.name }}
+    spec:
+      initContainers:
+        - name: wait-for-gateway-service
+          image: busybox:1.36
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for Gateway Service..."
+              until nc -z gateway-service 8080; do echo "Waiting for Gateway Service at :8080..."; sleep 2; done
+              echo "Gateway Service is ready!"
+      containers:
+        - name: {{ .Values.locationService.name }}
+          image: {{ include "openspot.image" (dict "image" .Values.locationService.image "Values" .Values) }}
+          imagePullPolicy: {{ include "openspot.imagePullPolicy" . }}
+          args:
+            - "--spring.cloud.config.uri={{ .Values.locationService.env.SPRING_CLOUD_CONFIG_URI }}"
+            - "--spring.config.import=configserver:{{ .Values.locationService.env.SPRING_CLOUD_CONFIG_URI }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.locationService.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: {{ .Values.locationService.env.SPRING_CLOUD_CONFIG_URI | quote }}
+            - name: SPRING_CONFIG_IMPORT
+              value: "configserver:{{ .Values.locationService.env.SPRING_CLOUD_CONFIG_URI }}"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dspring.cloud.config.uri={{ .Values.locationService.env.SPRING_CLOUD_CONFIG_URI }} -Dspring.config.import=configserver:{{ .Values.locationService.env.SPRING_CLOUD_CONFIG_URI }}"
+            - name: POSTGRES_HOST
+              value: {{ .Values.locationService.env.POSTGRES_HOST | quote }}
+            - name: REDIS_HOST
+              value: {{ .Values.locationService.env.REDIS_HOST | quote }}
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.locationService.env.KAFKA_BOOTSTRAP_SERVERS | quote }}
+          envFrom:
+            - configMapRef:
+                name: openspot-config
+            - secretRef:
+                name: openspot-secrets
+          resources:
+            {{- toYaml .Values.locationService.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 180
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+{{- end }}

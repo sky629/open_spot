@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:openspot}
+    url: jdbc:postgresql://${POSTGRES_HOST:postgresql}:${POSTGRES_PORT:5432}/${POSTGRES_DB:openspot}
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
@@ -23,7 +23,7 @@ spring:
     default-schema: auth
     
   redis:
-    host: ${REDIS_HOST:localhost}
+    host: ${REDIS_HOST:redis}
     port: ${REDIS_PORT:6379}
     database: ${REDIS_DB:0}
     password: ${REDIS_PASSWORD:}
@@ -34,6 +34,7 @@ spring:
         max-wait: -1ms
         max-idle: 8
         min-idle: 0
+      shutdown-timeout: 2000ms
     
   security:
     oauth2:
@@ -70,6 +71,7 @@ app:
     allowed-redirect-uris:
       - http://localhost:3000/login
       - http://localhost/login
+      - base-url
 
   cookie:
     # 쿠키 보안 설정 (Refresh Token 전용)
@@ -91,6 +93,13 @@ management:
     web:
       exposure:
         include: health, info, refresh
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    redis:
+      enabled: false  # Redis 헬스 체크 비활성화 (헬스 체크에서 제외)
 
 resilience4j:
   circuitbreaker:

@@ -1,0 +1,92 @@
+{{- if .Values.notificationService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.notificationService.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.notificationService.name }}
+    {{- include "openspot.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.notificationService.service.type }}
+  ports:
+    - port: {{ .Values.notificationService.service.port }}
+      targetPort: {{ .Values.notificationService.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.notificationService.name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.notificationService.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.notificationService.name }}
+    {{- include "openspot.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.notificationService.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.notificationService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.notificationService.name }}
+    spec:
+      initContainers:
+        - name: wait-for-gateway-service
+          image: busybox:1.36
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for Gateway Service..."
+              until nc -z gateway-service 8080; do echo "Waiting for Gateway Service at :8080..."; sleep 2; done
+              echo "Gateway Service is ready!"
+      containers:
+        - name: {{ .Values.notificationService.name }}
+          image: {{ include "openspot.image" (dict "image" .Values.notificationService.image "Values" .Values) }}
+          imagePullPolicy: {{ include "openspot.imagePullPolicy" . }}
+          args:
+            - "--spring.cloud.config.uri={{ .Values.notificationService.env.SPRING_CLOUD_CONFIG_URI }}"
+            - "--spring.config.import=configserver:{{ .Values.notificationService.env.SPRING_CLOUD_CONFIG_URI }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.notificationService.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: {{ .Values.notificationService.env.SPRING_CLOUD_CONFIG_URI | quote }}
+            - name: SPRING_CONFIG_IMPORT
+              value: "configserver:{{ .Values.notificationService.env.SPRING_CLOUD_CONFIG_URI }}"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dspring.cloud.config.uri={{ .Values.notificationService.env.SPRING_CLOUD_CONFIG_URI }} -Dspring.config.import=configserver:{{ .Values.notificationService.env.SPRING_CLOUD_CONFIG_URI }}"
+            - name: POSTGRES_HOST
+              value: {{ .Values.notificationService.env.POSTGRES_HOST | quote }}
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.notificationService.env.KAFKA_BOOTSTRAP_SERVERS | quote }}
+          envFrom:
+            - configMapRef:
+                name: openspot-config
+            - secretRef:
+                name: openspot-secrets
+          resources:
+            {{- toYaml .Values.notificationService.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 150
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+{{- end }}

@@ -65,7 +65,6 @@ class LocationRepositoryImpl(
     }
 
     override fun findByUserIdAndKeyword(userId: UUID, keyword: String, pageable: Pageable): Page<Location> {
-        // QueryDSL Custom Repository 사용
         return locationJpaRepository.findByUserIdAndKeyword(userId, keyword, pageable)
             .map { it.toDomain() }
     }
@@ -99,7 +98,6 @@ class LocationRepositoryImpl(
     }
 
     override fun countByUserIdAndCategoryId(userId: UUID): Map<UUID, Long> {
-        // QueryDSL Custom Repository 사용
         return locationJpaRepository.countByUserIdGroupByCategory(userId)
     }
 

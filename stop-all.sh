@@ -8,7 +8,7 @@ pkill -f "gradle.*bootRun"
 
 # Stop Docker containers
 echo "🐳 Stopping Docker containers..."
-docker-compose down
+docker-compose -f docker-compose.infra.yml down
 
 echo "✅ All services stopped!"
 echo ""

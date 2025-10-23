@@ -1,0 +1,28 @@
+apiVersion: v2
+name: openspot
+description: Open-Spot MSA Backend - 지도 기반 위치 공유 플랫폼
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+keywords:
+  - microservices
+  - spring-boot
+  - kotlin
+  - location-service
+  - msa
+
+maintainers:
+  - name: kitaekang
+    email: kkt629@gmail.com
+
+# Dependencies (optional - 외부 Charts 사용 시)
+# dependencies:
+#   - name: postgresql
+#     version: "12.x.x"
+#     repository: "https://charts.bitnami.com/bitnami"
+#     condition: postgresql.enabled
+#   - name: redis
+#     version: "17.x.x"
+#     repository: "https://charts.bitnami.com/bitnami"
+#     condition: redis.enabled

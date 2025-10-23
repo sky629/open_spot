@@ -13,16 +13,16 @@ else
     echo "⚠️ No .env file found. Using system environment variables."
 fi
 
-# Start Docker infrastructure
+# Start Docker infrastructure (infrastructure only)
 echo "📦 Starting Docker containers (PostgreSQL, Redis, Kafka)..."
-docker-compose up -d
+docker-compose -f docker-compose.infra.yml up -d
 
 echo "⏳ Waiting for services to be ready..."
 sleep 2
 
 # Check if services are running
 echo "✅ Checking service health..."
-docker-compose ps
+docker-compose -f docker-compose.infra.yml ps
 
 # Health check function
 wait_for_service() {
