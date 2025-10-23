@@ -106,43 +106,86 @@ curl http://localhost:8080/api/v1/locations/health
 ./7-cleanup.sh
 ```
 
-### Cloudflare 프로덕션 배포 (Minikube LoadBalancer + 공인 IP)
+### Cloudflare 프로덕션 배포 (HTTPS + Origin 인증서)
 
 **목표**: `https://api.openspot.kang-labs.com`을 내 컴퓨터의 Kubernetes Gateway로 연결
 
+#### 전제 조건
 ```bash
-# 1. Minikube 클러스터 및 Helm 배포 완료
-# (위의 1-4 단계 실행)
+# 1. Cloudflare Origin 인증서 발급 및 다운로드
+# - Cloudflare 대시보드 → SSL/TLS → Origin Server
+# - 인증서 생성 및 다운로드:
+#   - Origin Certificate: kang-labs_origin_cert.pem
+#   - Private Key: kang-labs_private.key
+# - origin_cert/ 폴더에 저장
 
-# 2. Gateway LoadBalancer 확인
-kubectl get svc gateway-service -n openspot
-# EXTERNAL-IP: 127.0.0.1 (또는 Minikube IP)
-# PORT: 8080:xxxxx/TCP
+# 2. .env 설정
+cp .env.example .env
+# GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET 입력
 
-# 3. 로컬 테스트
-curl http://localhost:8080/api/v1/auth/health
-
-# 4. Cloudflare DNS 설정
-# 콘솔에 로그인 → DNS 설정:
-# - Type: A
-# - Name: api.openspot
-# - Content: <your-public-ip>  (예: 203.0.113.42)
-# - Proxy: OFF (회색 구름)
-# - TTL: Auto
-
-# 5. 공유기 포트포워딩 설정
+# 3. 공유기 포트포워딩 설정 (사전 설정)
 # - 프로토콜: TCP
 # - 외부 포트: 443 (HTTPS)
 # - 내부 호스트: 컴퓨터 IP (예: 192.168.1.100)
-# - 내부 포트: 8080
+# - 내부 포트: 443
+```
 
-# 6. 외부 테스트
+#### 배포 순서
+```bash
+# 1. Minikube 클러스터 생성 (Helm Ingress 자동 설치)
+cd k8s/scripts
+./2-create-cluster.sh
+# → Nginx Ingress Controller가 LoadBalancer 타입으로 설치됨
+# → HTTPS 포트 443 자동 활성화
+
+# 2. Docker 이미지 빌드
+./3-build-images.sh
+
+# 3. Kubernetes에 배포 (자동으로 Origin 인증서 로드)
+./4-deploy.sh
+# → origin_cert/ 폴더에서 인증서 자동 감지
+# → cloudflare-origin-tls Secret 생성
+# → Ingress에 TLS 설정 자동 적용
+
+# 4. Minikube tunnel 실행 (다른 터미널)
+./5-start-tunnel.sh
+# → Localhost:443에서 Ingress 접근 가능
+
+# 5. 배포 확인
+kubectl get pods -n openspot
+kubectl get ingress -n openspot
+kubectl get secret -n openspot | grep cloudflare
+```
+
+#### HTTPS 테스트
+```bash
+# 로컬 테스트 (host 헤더 필요)
+curl -H "Host: openspot.local" https://localhost/api/v1/auth/health
+curl -H "Host: api.openspot.kang-labs.com" https://localhost/api/v1/auth/health
+
+# 공개 테스트 (Cloudflare DNS 설정 후)
 curl https://api.openspot.kang-labs.com/api/v1/auth/health
+```
 
-# 7. 프론트엔드 API 호출
-# 프론트엔드 (openspot.kang-labs.com)에서:
-# const API_BASE_URL = 'https://api.openspot.kang-labs.com';
-# fetch(`${API_BASE_URL}/api/v1/auth/login`, {...})
+#### Cloudflare SSL/TLS 설정
+```
+대시보드 → SSL/TLS → 개요
+- 암호화 모드: Full (strict) 선택
+  ✅ End-to-End HTTPS 암호화 (브라우저 ↔ Cloudflare ↔ 서버)
+```
+
+#### 아키텍처 흐름
+```
+브라우저 (HTTPS 443)
+    ↓
+Cloudflare (api.openspot.kang-labs.com)
+    ↓ Full (strict) SSL
+공유기 포트포워딩 (443:443)
+    ↓
+Nginx Ingress Controller (HTTPS, LoadBalancer)
+    ↓ TLS Termination (Cloudflare Origin 인증서)
+    ↓ HTTP
+Gateway Service (8080)
 ```
 
 **흐름도**:

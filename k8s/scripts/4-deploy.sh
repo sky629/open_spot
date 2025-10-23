@@ -27,6 +27,23 @@ JWT_SECRET="${JWT_SECRET:-open-spot-jwt-secret-key-for-local-development-change-
 GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-your-google-client-id}"
 GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-your-google-client-secret}"
 
+# TLS 인증서 로드 (Cloudflare Origin)
+PROJECT_ROOT="../.."
+CERT_FILE="${PROJECT_ROOT}/origin_cert/kang-labs_origin_cert.pem"
+KEY_FILE="${PROJECT_ROOT}/origin_cert/kang-labs_private.key"
+
+if [ -f "$CERT_FILE" ] && [ -f "$KEY_FILE" ]; then
+    echo "✅ TLS 인증서 파일 발견"
+    TLS_CERT=$(cat "$CERT_FILE")
+    TLS_KEY=$(cat "$KEY_FILE")
+else
+    echo "⚠️  TLS 인증서 파일을 찾을 수 없습니다."
+    echo "   경로: $CERT_FILE, $KEY_FILE"
+    echo "   HTTPS 사용 불가. HTTP로만 배포됩니다."
+    TLS_CERT=""
+    TLS_KEY=""
+fi
+
 # Check if Helm release exists
 if helm list -n ${NAMESPACE} | grep -q "^${RELEASE_NAME}"; then
     echo "⚠️  Release '${RELEASE_NAME}' already exists"
@@ -41,6 +58,8 @@ if helm list -n ${NAMESPACE} | grep -q "^${RELEASE_NAME}"; then
             --set "secrets.jwt.secret=${JWT_SECRET}" \
             --set "secrets.google.clientId=${GOOGLE_CLIENT_ID}" \
             --set "secrets.google.clientSecret=${GOOGLE_CLIENT_SECRET}" \
+            --set "tls.cert=${TLS_CERT}" \
+            --set "tls.key=${TLS_KEY}" \
             --wait \
             --timeout 15m
         echo "✅ Helm release upgraded"
@@ -62,6 +81,8 @@ else
         --set "secrets.jwt.secret=${JWT_SECRET}" \
         --set "secrets.google.clientId=${GOOGLE_CLIENT_ID}" \
         --set "secrets.google.clientSecret=${GOOGLE_CLIENT_SECRET}" \
+        --set "tls.cert=${TLS_CERT}" \
+        --set "tls.key=${TLS_KEY}" \
         --wait \
         --timeout 15m
     echo "✅ Helm release installed"
@@ -110,9 +131,13 @@ echo "📋 Ingress:"
 kubectl get ingress -n ${NAMESPACE}
 echo ""
 echo "💡 Access the application:"
-echo "   - http://openspot.local"
-echo "   - http://openspot.local/api/v1/auth/health"
-echo "   - http://openspot.local/api/v1/locations/health"
+if [ ! -z "$TLS_CERT" ]; then
+    echo "   - https://api.openspot.kang-labs.com/api/v1/auth/health (공개)"
+    echo "   - https://openspot.local/api/v1/auth/health (로컬)"
+else
+    echo "   - http://openspot.local/api/v1/auth/health"
+    echo "   - http://openspot.local/api/v1/locations/health"
+fi
 echo ""
 echo "💡 Useful commands:"
 echo "   - kubectl get pods -n ${NAMESPACE}"

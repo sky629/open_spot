@@ -1,0 +1,150 @@
+# ==============================================================================
+# Nginx Ingress Controller Helm Chart Values
+# ==============================================================================
+# 환경: 개발 (minikube), 스테이징 (AWS EKS), 프로덕션 (GKE) 등
+# 사용법:
+#   helm install ingress-nginx ingress-nginx/ingress-nginx \
+#     -f k8s/helm/ingress-nginx/values.yaml \
+#     -n ingress-nginx --create-namespace
+# ==============================================================================
+
+# 컨트롤러 설정
+controller:
+  # 레플리카 수 (개발: 1, 프로덕션: 3+)
+  replicaCount: 1
+
+  # 이미지 설정
+  image:
+    registry: registry.k8s.io
+    image: ingress-nginx/controller
+    tag: "v1.10.0"
+    pullPolicy: IfNotPresent
+
+  # 리소스 제한
+  resources:
+    requests:
+      cpu: 100m
+      memory: 90Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # 서비스 설정
+  service:
+    type: LoadBalancer  # ✅ Minikube tunnel 지원
+    externalTrafficPolicy: Local
+
+    # 외부 IP 설정 (필요 시)
+    externalIPs: []
+
+    # NodePort 지정 (선택사항)
+    # nodePort:
+    #   http: 30080
+    #   https: 30443
+
+    # 포트 설정 (HTTP & HTTPS)
+    ports:
+      http: 80
+      https: 443
+
+    # LoadBalancer IP (AWS/GCP/Azure에서 고정 IP 할당 시)
+    # loadBalancerIP: ""
+
+    # LoadBalancer 소스 IP 제한 (보안)
+    loadBalancerSourceRanges: []
+
+  # Pod 배치 정책
+  affinity: {}
+  nodeSelector: {}
+  tolerations: []
+
+  # 헬스체크
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 5
+    successThreshold: 1
+
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+  # 환경 변수 (NGINX 설정)
+  config:
+    # 타임아웃 설정
+    proxy-connect-timeout: "600"
+    proxy-send-timeout: "600"
+    proxy-read-timeout: "600"
+
+    # 로깅
+    log-format-upstream: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_time $upstream_response_time $pipe'
+
+    # 성능 최적화
+    worker-processes: auto
+    worker-connections: "8192"
+
+  # 보안 설정
+  hostNetwork: false
+  dnsPolicy: ClusterFirst
+
+# 입장권 검증 (webhook)
+admissionWebhooks:
+  enabled: true
+  patch:
+    enabled: true
+    image:
+      registry: registry.k8s.io
+      image: ingress-nginx/kube-webhook-certgen
+      tag: "v20231226"
+
+# 기본 백엔드 (404 핸들링)
+defaultBackend:
+  enabled: true
+  image:
+    registry: registry.k8s.io
+    image: defaultbackend-amd64
+    tag: "1.5"
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 20Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# 모니터링 (PrometheusRule, ServiceMonitor)
+prometheus:
+  create: false
+  # 프로덕션에서는 true로 설정하고 Prometheus 구성
+  # serviceMonitor:
+  #   enabled: true
+
+# 보안 정책
+podSecurityPolicy:
+  enabled: false
+
+# RBAC 설정
+rbac:
+  create: true
+
+# 서비스 어카운트
+serviceAccount:
+  create: true
+  automount: true
+  name: ingress-nginx
+
+# 네트워크 정책 (필요 시)
+networkPolicy:
+  enabled: false
+
+# 이 값들은 환경별로 오버라이드할 수 있습니다:
+# - values-dev.yaml: 개발 환경 (minikube)
+# - values-staging.yaml: 스테이징 환경 (AWS EKS)
+# - values-prod.yaml: 프로덕션 환경 (GKE, AKS)

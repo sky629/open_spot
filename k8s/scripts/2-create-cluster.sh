@@ -51,6 +51,10 @@ kubectl config use-context ${CLUSTER_NAME}
 echo "⏳ Waiting for nodes to be ready..."
 kubectl wait --for=condition=Ready nodes --all --timeout=300s
 
+# Install Ingress NGINX Controller via Helm
+echo "📦 Installing Nginx Ingress Controller..."
+"${SCRIPT_DIR}/install-ingress.sh"
+
 # Get minikube IP
 MINIKUBE_IP=$(minikube ip -p ${CLUSTER_NAME})
 

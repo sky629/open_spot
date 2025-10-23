@@ -89,7 +89,6 @@ start_cluster() {
         --disk-size="$DISK_SIZE" \
         --kubernetes-version="$K8S_VERSION" \
         --container-runtime=containerd \
-        --addons=ingress \
         --addons=metrics-server \
         --addons=dashboard
 

@@ -277,8 +277,8 @@ ingress:
   enabled: true
   className: nginx
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"  # HTTPS로 리다이렉트
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"  # Backend는 HTTP
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
@@ -298,11 +298,21 @@ ingress:
           service: gateway-service
           port: 8080
 
-  # TLS 설정 (optional)
-  # tls:
-  #   - secretName: openspot-tls
-  #     hosts:
-  #       - openspot.local
+  # TLS 설정 (Cloudflare Origin 인증서)
+  tls:
+    - secretName: cloudflare-origin-tls
+      hosts:
+        - api.openspot.kang-labs.com
+        - openspot.local
+
+# ==============================================================================
+# TLS Configuration
+# ==============================================================================
+tls:
+  # Cloudflare Origin 인증서 (자동으로 base64 인코딩됨)
+  # 배포 스크립트에서 파일 내용을 읽어 주입함
+  cert: ""  # kang-labs_origin_cert.pem 파일 내용
+  key: ""   # kang-labs_private.key 파일 내용
 
 # ==============================================================================
 # Secrets & ConfigMaps
