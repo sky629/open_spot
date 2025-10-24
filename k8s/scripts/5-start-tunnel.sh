@@ -20,6 +20,9 @@ if [ -f "$PID_FILE" ]; then
     fi
 fi
 
+echo "sudo 권한 미리 갱신"
+sudo -v
+
 # Start tunnel in background
 nohup minikube tunnel -p "$CLUSTER_NAME" > "$LOG_FILE" 2>&1 &
 NEW_PID=$!
