@@ -956,7 +956,6 @@ spring:
 # ========================================
 # Auth Service (8081)
 # ========================================
-GET  /api/v1/auth/google/login?redirect_uri=<url>  # Google OAuth2 로그인 시작
 POST /api/v1/auth/token/refresh                   # JWT 토큰 갱신
 POST /api/v1/auth/logout                          # 로그아웃
 

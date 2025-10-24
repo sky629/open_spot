@@ -28,7 +28,7 @@ open class AuthSecurityConfig(
                     // 헬스 체크 엔드포인트는 인증 없이 접근 허용
                     .requestMatchers("/api/v1/auth/health", "/actuator/health").permitAll()
                     // OAuth2 로그인 관련 엔드포인트 허용
-                    .requestMatchers("/api/v1/auth/google/login", "/oauth2/**", "/login/oauth2/**").permitAll()
+                    .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                     // 토큰 갱신은 인증 없이 허용 (리프레시 토큰으로 검증)
                     .requestMatchers("/api/v1/auth/token/refresh").permitAll()
                     // Gateway에서 JWT 검증 완료 후 X-User-Id 헤더 추가하므로 모든 요청 허용
@@ -39,7 +39,6 @@ open class AuthSecurityConfig(
             // OAuth2 Client 설정 (Google 로그인)
             .oauth2Login { oauth2 ->
                 oauth2
-                    .loginPage("/api/v1/auth/google/login")
                     .successHandler(oAuth2LoginSuccessHandler)
                     .failureHandler(oAuth2LoginFailureHandler)
             }

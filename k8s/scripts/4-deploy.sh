@@ -96,7 +96,7 @@ echo ""
 # Wait for infrastructure services first (longer timeout for databases)
 echo "📊 Waiting for infrastructure services (PostgreSQL, Redis, Kafka, Zookeeper)..."
 kubectl wait --for=condition=Ready pods -n ${NAMESPACE} \
-    -l app in (postgresql,redis,kafka,zookeeper) \
+    -l 'app in (postgresql,redis,kafka,zookeeper)' \
     --timeout=600s 2>/dev/null || {
     echo "⚠️  Infrastructure services not ready yet. Continuing..."
 }
@@ -104,7 +104,7 @@ kubectl wait --for=condition=Ready pods -n ${NAMESPACE} \
 # Wait for application services
 echo "📊 Waiting for application services..."
 kubectl wait --for=condition=Ready pods -n ${NAMESPACE} \
-    -l app in (config-service,gateway-service,auth-service,location-service,notification-service) \
+    -l 'app in (config-service,gateway-service,auth-service,location-service,notification-service)' \
     --timeout=300s || {
     echo "⚠️  Some pods are not ready yet. Checking status..."
 }
@@ -142,5 +142,4 @@ echo ""
 echo "💡 Useful commands:"
 echo "   - kubectl get pods -n ${NAMESPACE}"
 echo "   - kubectl logs -f <pod-name> -n ${NAMESPACE}"
-echo "   - kubectl port-forward svc/gateway-service 8080:8080 -n ${NAMESPACE}"
 echo "   - helm list -n ${NAMESPACE}"

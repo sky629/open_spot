@@ -10,7 +10,6 @@ import com.kangpark.openspot.common.web.dto.ErrorResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
-import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.hibernate.validator.constraints.UUID
 import org.slf4j.LoggerFactory
@@ -27,44 +26,11 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/v1/auth")
 class AuthController(
     private val authApplicationService: AuthApplicationService,
-    private val cookieFactory: CookieFactory
+    private val cookieFactory: CookieFactory,
 ) {
-    
+
     private val logger = LoggerFactory.getLogger(AuthController::class.java)
-    
-    companion object {
-        const val REDIRECT_URI_SESSION_KEY = "OAUTH2_REDIRECT_URI"
-    }
 
-    /**
-     * Google OAuth2 로그인 시작
-     * 실제 로그인은 OAuth2LoginSuccessHandler에서 처리됨
-     */
-    @Operation(
-        summary = "Google OAuth2 로그인",
-        description = """
-            Google OAuth2를 통한 사용자 인증을 시작합니다. 성공 시 JWT 토큰이 발급됩니다.
-
-            redirect_uri 파라미터를 통해 로그인 성공 후 리다이렉트할 URL을 지정할 수 있습니다.
-            화이트리스트에 등록된 URL만 허용됩니다.
-        """
-    )
-    @GetMapping("/google/login")
-    fun login(
-        @Parameter(description = "로그인 성공 후 리다이렉트할 URL (선택사항)")
-        @RequestParam(name = "redirect_uri", required = false) redirectUri: String?,
-        request: HttpServletRequest,
-        response: HttpServletResponse
-    ) {
-        // redirect_uri를 Session에 저장 (OAuth2 플로우 완료 후 사용)
-        redirectUri?.let {
-            request.session.setAttribute(REDIRECT_URI_SESSION_KEY, it)
-            logger.debug("Stored redirect_uri in session: $it")
-        }
-
-        response.sendRedirect("/oauth2/authorization/google")
-    }
-    
     /**
      * JWT 토큰 갱신 (HttpOnly 쿠키 사용)
      * Access Token은 Response Body로, Refresh Token은 HttpOnly Cookie로 반환

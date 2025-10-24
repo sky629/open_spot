@@ -49,7 +49,6 @@ open class GatewaySecurityConfig(
                     // Auth service public endpoints
                     .requestMatchers(
                         "/api/v1/auth/health",
-                        "/api/v1/auth/google/login",
                         "/oauth2/**",
                         "/login/oauth2/**"
                     ).permitAll()
