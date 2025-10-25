@@ -132,7 +132,7 @@ kubectl get ingress -n ${NAMESPACE}
 echo ""
 echo "💡 Access the application:"
 if [ ! -z "$TLS_CERT" ]; then
-    echo "   - https://api.openspot.kang-labs.com/api/v1/auth/health (공개)"
+    echo "   - https://api.kang-labs.com/api/v1/auth/health (공개)"
     echo "   - https://openspot.local/api/v1/auth/health (로컬)"
 else
     echo "   - http://openspot.local/api/v1/auth/health"

@@ -23,8 +23,8 @@ fi
 echo "sudo 권한 미리 갱신"
 sudo -v
 
-# Start tunnel in background
-nohup minikube tunnel -p "$CLUSTER_NAME" > "$LOG_FILE" 2>&1 &
+# Start tunnel in background with sudo (required for ports 80/443)
+sudo nohup minikube tunnel -p "$CLUSTER_NAME" --bind-address=0.0.0.0 > "$LOG_FILE" 2>&1 &
 NEW_PID=$!
 
 # Save PID

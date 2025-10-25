@@ -25,9 +25,9 @@ if ! kill -0 "$PID" 2>/dev/null; then
     exit 0
 fi
 
-# Kill the process
+# Kill the process (use sudo if needed for background sudo processes)
 echo "   Killing process (PID: $PID)..."
-kill "$PID" 2>/dev/null || true
+sudo kill "$PID" 2>/dev/null || kill "$PID" 2>/dev/null || true
 
 # Wait for process to exit
 TIMEOUT=5
@@ -37,10 +37,10 @@ while kill -0 "$PID" 2>/dev/null && [ $COUNT -lt $TIMEOUT ]; do
     COUNT=$((COUNT + 1))
 done
 
-# Force kill if still running
+# Force kill if still running (use sudo for background sudo processes)
 if kill -0 "$PID" 2>/dev/null; then
     echo "   Force killing process..."
-    kill -9 "$PID" 2>/dev/null || true
+    sudo kill -9 "$PID" 2>/dev/null || kill -9 "$PID" 2>/dev/null || true
     sleep 1
 fi
 
