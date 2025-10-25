@@ -291,7 +291,7 @@ ingress:
           pathType: Prefix
           service: gateway-service
           port: 8080
-    - host: api.openspot.kang-labs.com
+    - host: api.kang-labs.com
       paths:
         - path: /
           pathType: Prefix
@@ -302,7 +302,7 @@ ingress:
   tls:
     - secretName: cloudflare-origin-tls
       hosts:
-        - api.openspot.kang-labs.com
+        - api.kang-labs.com
         - openspot.local
 
 # ==============================================================================

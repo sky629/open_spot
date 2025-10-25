@@ -115,7 +115,7 @@ curl http://localhost:8080/api/v1/locations/health
 **1단계: Cloudflare DNS 설정**
 ```
 - Type: A
-- Name: api.openspot
+- Name: api.kang-labs.com
 - Content: <your-public-ip>  (예: 203.0.113.42)
 - Proxy: OFF (회색 구름)
 - TTL: Auto
@@ -132,13 +132,13 @@ curl http://localhost:8080/api/v1/locations/health
 **3단계: 테스트**
 ```bash
 # 외부에서 접근 (HTTPS)
-curl https://api.openspot.kang-labs.com/api/v1/auth/health
+curl https://api.kang-labs.com/api/v1/auth/health
 ```
 
 **4단계: 프론트엔드 연결**
 ```javascript
 // 프론트엔드에서
-const API_BASE_URL = 'https://api.openspot.kang-labs.com';
+const API_BASE_URL = 'https://api.kang-labs.com';
 fetch(`${API_BASE_URL}/api/v1/auth/login`, {...})
 ```
 

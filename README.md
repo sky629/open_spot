@@ -106,7 +106,7 @@ curl http://localhost:8080/api/v1/locations/health
 ```bash
 # 1. Cloudflare DNS 설정
 # - Type: A
-# - Name: api.openspot
+# - Name: api.kang-labs.com
 # - Content: <your-public-ip>
 # - Proxy: OFF (회색 구름)
 
@@ -114,7 +114,7 @@ curl http://localhost:8080/api/v1/locations/health
 # - 외부: 443 → 내부: 컴퓨터-IP:8080
 
 # 3. 테스트
-curl https://api.openspot.kang-labs.com/api/v1/auth/health
+curl https://api.kang-labs.com/api/v1/auth/health
 ```
 
 자세한 내용: [k8s/README.md](./k8s/README.md#5-외부-접근-설정-및-테스트)

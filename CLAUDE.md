@@ -108,7 +108,7 @@ curl http://localhost:8080/api/v1/locations/health
 
 ### Cloudflare 프로덕션 배포 (HTTPS + Origin 인증서)
 
-**목표**: `https://api.openspot.kang-labs.com`을 내 컴퓨터의 Kubernetes Gateway로 연결
+**목표**: `https://api.kang-labs.com`을 내 컴퓨터의 Kubernetes Gateway로 연결
 
 #### 전제 조건
 ```bash
@@ -161,10 +161,10 @@ kubectl get secret -n openspot | grep cloudflare
 ```bash
 # 로컬 테스트 (host 헤더 필요)
 curl -H "Host: openspot.local" https://localhost/api/v1/auth/health
-curl -H "Host: api.openspot.kang-labs.com" https://localhost/api/v1/auth/health
+curl -H "Host: api.kang-labs.com" https://localhost/api/v1/auth/health
 
 # 공개 테스트 (Cloudflare DNS 설정 후)
-curl https://api.openspot.kang-labs.com/api/v1/auth/health
+curl https://api.kang-labs.com/api/v1/auth/health
 ```
 
 #### Cloudflare SSL/TLS 설정
@@ -178,7 +178,7 @@ curl https://api.openspot.kang-labs.com/api/v1/auth/health
 ```
 브라우저 (HTTPS 443)
     ↓
-Cloudflare (api.openspot.kang-labs.com)
+Cloudflare (api.kang-labs.com)
     ↓ Full (strict) SSL
 공유기 포트포워딩 (443:443)
     ↓
@@ -191,7 +191,7 @@ Gateway Service (8080)
 **흐름도**:
 ```
 브라우저/프론트엔드
-    ↓ https://api.openspot.kang-labs.com
+    ↓ https://api.kang-labs.com
 Cloudflare DNS (A 레코드)
     ↓ 203.0.113.42 (공인 IP)
 공유기 포트포워딩 (443 → 컴퓨터:8080)
