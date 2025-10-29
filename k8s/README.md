@@ -56,19 +56,56 @@ helm version
 
 ## 빠른 시작
 
+### 0️⃣ 환경변수 설정 (중요!)
+
+Kubernetes 배포 전에 **반드시** `.env.k8s` 파일을 설정해야 합니다.
+
+```bash
+# 프로젝트 루트 디렉토리에서 실행
+cd ../..
+
+# .env.k8s 파일 생성
+cp .env.example .env.k8s
+
+# .env.k8s 파일 편집 (Google OAuth, JWT Secret, Postgres Password 등 설정)
+nano .env.k8s
+# 또는
+vi .env.k8s
+```
+
+**필수 설정 항목:**
+```bash
+# .env.k8s 파일에서 수정할 항목
+GOOGLE_CLIENT_ID=your-actual-google-client-id
+GOOGLE_CLIENT_SECRET=your-actual-google-client-secret
+JWT_SECRET=your-secure-jwt-secret-key
+POSTGRES_PASSWORD=your-postgres-password
+```
+
+**주의:**
+- ⚠️ **로컬 Docker 개발**: `.env` 파일 사용 (localhost 값)
+- ⚠️ **Kubernetes 배포**: `.env.k8s` 파일 사용 (서비스명 값)
+- ✅ Redis, PostgreSQL, Kafka 호스트는 이미 올바르게 설정됨 (`redis`, `postgresql`, `kafka`)
+
+**환경 파일 비교:**
+
+| 파일 | 용도 | Redis | PostgreSQL | Kafka |
+|------|------|-------|-----------|-------|
+| `.env` | 로컬 Docker | localhost | localhost | localhost:9092 |
+| `.env.k8s` | Kubernetes | redis | postgresql | kafka:9092 |
+
 ### 1. 도구 설치 (선택사항)
 
 Minikube, kubectl, helm이 이미 설치되어 있으면 건너뛰세요.
 
 ```bash
-cd k8s/scripts
-./1-install-tools.sh
+sh k8s/scripts/1-install-tools.sh
 ```
 
 ### 2. Kubernetes 클러스터 생성
 
 ```bash
-./2-create-cluster.sh
+sh k8s/scripts/2-create-cluster.sh
 ```
 
 이 스크립트는 자동으로:
@@ -82,13 +119,13 @@ cd k8s/scripts
 ### 3. Docker 이미지 빌드 및 로드
 
 ```bash
-./3-build-images.sh
+sh k8s/scripts/3-build-images.sh
 ```
 
 ### 4. Helm으로 배포
 
 ```bash
-./4-deploy.sh
+sh k8s/scripts/4-deploy.sh
 ```
 
 배포 중 진행 상황:
@@ -160,7 +197,7 @@ minikube dashboard -p openspot
 ### 6. 클러스터 정리 및 삭제
 
 ```bash
-./7-cleanup.sh
+sh k8s/scripts/7-cleanup.sh
 ```
 
 ## 리소스 할당
@@ -389,8 +426,7 @@ kubectl logs postgresql-0 -n openspot --tail=50
 minikube image ls -p openspot | grep openspot
 
 # 이미지 재빌드 및 로드
-cd k8s/scripts
-./3-build-images.sh
+sh k8s/scripts/3-build-images.sh
 
 # Minikube 이미지 캐시 확인
 minikube ssh -p openspot -- docker images | grep openspot
@@ -488,16 +524,14 @@ kubectl exec -it postgresql-0 -n openspot -- ls -la /var/lib/postgresql/data/
 ### 🚀 배포 시작하기
 
 ```bash
-cd k8s/scripts
-
 # 1단계: 클러스터 생성
-./2-create-cluster.sh
+sh k8s/scripts/2-create-cluster.sh
 
 # 2단계: 이미지 빌드
-./3-build-images.sh
+sh k8s/scripts/3-build-images.sh
 
 # 3단계: Helm 배포
-./4-deploy.sh
+sh k8s/scripts/4-deploy.sh
 
 # 4단계: 상태 확인
 kubectl get pods -n openspot

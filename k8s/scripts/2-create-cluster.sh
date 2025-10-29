@@ -1,11 +1,18 @@
 #!/bin/bash
 set -e
 
+# ========================================================================
+# Script Path Detection
+# 스크립트 위치를 기반으로 프로젝트 루트 자동 탐지
+# ========================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+K8S_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 echo "🚀 Creating Minikube Kubernetes Cluster..."
+echo "📂 Project Root: $PROJECT_ROOT"
 
 CLUSTER_NAME="openspot"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-K8S_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Check if minikube is installed
 if ! command -v minikube &> /dev/null; then

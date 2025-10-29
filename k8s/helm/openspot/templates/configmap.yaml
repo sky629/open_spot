@@ -7,35 +7,35 @@ metadata:
     {{- include "openspot.labels" . | nindent 4 }}
 data:
   # Database configuration
-  POSTGRES_HOST: "postgresql"
-  POSTGRES_PORT: "5432"
-  POSTGRES_DB: {{ .Values.postgresql.env.POSTGRES_DB | quote }}
-  POSTGRES_USER: {{ .Values.postgresql.env.POSTGRES_USER | quote }}
+  POSTGRES_HOST: {{ .Values.config.postgresHost | quote }}
+  POSTGRES_PORT: {{ .Values.config.postgresPort | quote }}
+  POSTGRES_DB: {{ .Values.config.postgresDb | quote }}
+  POSTGRES_USER: {{ .Values.config.postgresUser | quote }}
 
   # Redis configuration
-  REDIS_HOST: "redis"
-  REDIS_PORT: "6379"
+  REDIS_HOST: {{ .Values.config.redisHost | quote }}
+  REDIS_PORT: {{ .Values.config.redisPort | quote }}
 
   # Kafka configuration
-  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-  ZOOKEEPER_CONNECT: "zookeeper:2181"
+  KAFKA_BOOTSTRAP_SERVERS: {{ .Values.config.kafkaBootstrapServers | quote }}
+  ZOOKEEPER_CONNECT: {{ .Values.config.zookeeperConnect | quote }}
 
   # Spring Cloud Config
-  SPRING_CLOUD_CONFIG_URI: "http://config-service:9999"
+  SPRING_CLOUD_CONFIG_URI: {{ .Values.config.springCloudConfigUri | quote }}
 
   # Service discovery configuration for Gateway routing
-  AUTH_SERVICE_HOST: "auth-service"
-  AUTH_SERVICE_PORT: "8081"
-  LOCATION_SERVICE_HOST: "location-service"
-  LOCATION_SERVICE_PORT: "8082"
-  NOTIFICATION_SERVICE_HOST: "notification-service"
-  NOTIFICATION_SERVICE_PORT: "8083"
+  AUTH_SERVICE_HOST: {{ .Values.config.authServiceHost | quote }}
+  AUTH_SERVICE_PORT: {{ .Values.config.authServicePort | quote }}
+  LOCATION_SERVICE_HOST: {{ .Values.config.locationServiceHost | quote }}
+  LOCATION_SERVICE_PORT: {{ .Values.config.locationServicePort | quote }}
+  NOTIFICATION_SERVICE_HOST: {{ .Values.config.notificationServiceHost | quote }}
+  NOTIFICATION_SERVICE_PORT: {{ .Values.config.notificationServicePort | quote }}
 
   # Frontend configuration
-  FRONTEND_BASE_URL: "https://openspot.kang-labs.com"
-  FRONTEND_AUTH_SUCCESS_PATH: "/login"
-  FRONTEND_AUTH_ERROR_PATH: "/login/error"
+  FRONTEND_BASE_URL: {{ .Values.config.frontendBaseUrl | quote }}
+  FRONTEND_AUTH_SUCCESS_PATH: {{ .Values.config.frontendAuthSuccessPath | quote }}
+  FRONTEND_AUTH_ERROR_PATH: {{ .Values.config.frontendAuthErrorPath | quote }}
 
   # OAuth2 Google Redirect URI (must match Google OAuth Console settings)
   # Gateway를 통한 외부 URL 사용 (클라이언트에서 접근 가능한 주소)
-  OAUTH2_REDIRECT_URI: "https://api.kang-labs.com/login/oauth2/code/google"
+  OAUTH2_REDIRECT_URI: {{ .Values.config.oauth2RedirectUri | quote }}

@@ -1,7 +1,15 @@
 #!/bin/bash
 set -e
 
+# ========================================================================
+# Script Path Detection
+# 스크립트 위치를 기반으로 프로젝트 루트 자동 탐지
+# ========================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 echo "🧹 Cleaning up Open-Spot Minikube environment..."
+echo "📂 Project Root: $PROJECT_ROOT"
 
 CLUSTER_NAME="openspot"
 NAMESPACE="openspot"

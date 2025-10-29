@@ -1,7 +1,16 @@
 #!/bin/bash
 set -e
 
+# ========================================================================
+# Script Path Detection
+# 스크립트 위치를 기반으로 프로젝트 루트 자동 탐지
+# 루트 디렉토리에서도, scripts 폴더에서도 실행 가능
+# ========================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 echo "🔧 Installing Kubernetes Development Tools for Minikube..."
+echo "📂 Project Root: $PROJECT_ROOT"
 
 # Color definitions
 RED='\033[0;31m'
@@ -92,11 +101,10 @@ DOCKER_VERSION=$(docker --version | cut -d' ' -f3 | tr -d ',')
 echo "   - Docker: ${DOCKER_VERSION}"
 
 echo ""
-echo -e "${GREEN}💡 Next steps:${NC}"
-echo "   1. Run: cd $(dirname $0)"
-echo "   2. Create cluster: ./2-create-cluster.sh"
-echo "   3. Build images: ./3-build-images.sh"
-echo "   4. Deploy: ./4-deploy.sh"
+echo -e "${GREEN}💡 Next steps (from project root):${NC}"
+echo "   1. Create cluster: sh k8s/scripts/2-create-cluster.sh"
+echo "   2. Build images: sh k8s/scripts/3-build-images.sh"
+echo "   3. Deploy: sh k8s/scripts/4-deploy.sh"
 echo ""
 echo -e "${YELLOW}💡 Useful commands:${NC}"
 echo "   - minikube status -p openspot"

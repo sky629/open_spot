@@ -66,10 +66,7 @@ Thumbs.db
 /data/
 /config/secrets/
 *.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.k8s
 
 # Firebase service account keys
 **/firebase/*.json

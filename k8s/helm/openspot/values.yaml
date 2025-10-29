@@ -315,6 +315,40 @@ tls:
   key: ""   # kang-labs_private.key 파일 내용
 
 # ==============================================================================
+# Application Configuration (ConfigMap)
+# ==============================================================================
+# Note: 이 값들은 4-deploy.sh에서 .env.k8s를 읽어 --set으로 오버라이드됨
+config:
+  # Frontend & OAuth2
+  frontendBaseUrl: "http://localhost:3000"  # 로컬 기본값
+  oauth2RedirectUri: "http://localhost:8080/login/oauth2/code/google"
+  frontendAuthSuccessPath: "/login"
+  frontendAuthErrorPath: "/login/error"
+
+  # Infrastructure Services (Kubernetes Service Names)
+  postgresHost: "postgresql"
+  postgresPort: "5432"
+  postgresDb: "openspot"
+  postgresUser: "postgres"
+
+  redisHost: "redis"
+  redisPort: "6379"
+
+  kafkaBootstrapServers: "kafka:9092"
+  zookeeperConnect: "zookeeper:2181"
+
+  # Service Discovery (Gateway routing)
+  authServiceHost: "auth-service"
+  authServicePort: "8081"
+  locationServiceHost: "location-service"
+  locationServicePort: "8082"
+  notificationServiceHost: "notification-service"
+  notificationServicePort: "8083"
+
+  # Spring Cloud Config
+  springCloudConfigUri: "http://config-service:9999"
+
+# ==============================================================================
 # Secrets & ConfigMaps
 # ==============================================================================
 secrets:

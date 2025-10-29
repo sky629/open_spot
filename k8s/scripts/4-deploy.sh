@@ -1,31 +1,62 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Deploying Open-Spot to Kubernetes..."
+# ========================================================================
+# Script Path Detection
+# 스크립트 위치를 기반으로 프로젝트 루트 자동 탐지
+# ========================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Load .env file from project root
-cd ../..
-if [ ! -f ".env" ]; then
-    echo "❌ .env file not found! Please copy .env.example to .env and configure it."
+echo "🚀 Deploying Open-Spot to Kubernetes..."
+echo "📂 Project Root: $PROJECT_ROOT"
+
+# Load .env.k8s file from project root (Kubernetes 배포 전용)
+cd "$PROJECT_ROOT"
+if [ ! -f ".env.k8s" ]; then
+    echo "❌ .env.k8s file not found! Please copy .env.example to .env.k8s and configure it."
+    echo "   .env.k8s는 Kubernetes 배포 전용 환경 파일입니다."
+    echo ""
+    echo "   For local Docker development, use .env instead."
+    echo "   로컬 Docker 개발에는 .env 파일을 사용하세요."
     exit 1
 fi
 
-# Source .env file
+# ========================================================================
+# Load .env.k8s for Kubernetes deployment
+# .env.k8s 파일 로드 (Kubernetes 배포 전용)
+#
+# This file contains:
+# 1. Secrets (POSTGRES_PASSWORD, JWT_SECRET, Google OAuth)
+# 2. Infrastructure settings with Kubernetes Service names
+#    (REDIS_HOST=redis, POSTGRES_HOST=postgresql, etc.)
+#
+# ConfigMap and values.yaml will use these settings.
+# ========================================================================
 set -a
-source .env
+source .env.k8s
 set +a
 
-cd k8s/helm
+cd "$PROJECT_ROOT/k8s/helm"
 
 RELEASE_NAME="openspot"
 NAMESPACE="openspot"
 VALUES_FILE="openspot/values.yaml"
 
-# Extract secrets from .env
-POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
-JWT_SECRET="${JWT_SECRET:-open-spot-jwt-secret-key-for-local-development-change-in-production}"
-GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-your-google-client-id}"
-GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-your-google-client-secret}"
+# ========================================================================
+# Load environment variables from .env.k8s
+# .env.k8s에서 읽은 값을 Helm에 전달
+# 기본값은 values.yaml에만 정의하므로 여기서 기본값 설정 불필요
+# ========================================================================
+# (변수들은 이미 source .env.k8s에서 로드됨)
+
+# ========================================================================
+# Validate required secrets from .env.k8s
+# ========================================================================
+if [ -z "${JWT_SECRET}" ] || [ -z "${POSTGRES_PASSWORD}" ]; then
+    echo "⚠️  Warning: JWT_SECRET or POSTGRES_PASSWORD not set in .env.k8s"
+    echo "   Using Helm values.yaml defaults (for development only)"
+fi
 
 # TLS 인증서 로드 (Cloudflare Origin)
 PROJECT_ROOT="../.."
@@ -51,9 +82,29 @@ if helm list -n ${NAMESPACE} | grep -q "^${RELEASE_NAME}"; then
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         echo "⬆️  Upgrading Helm release..."
+        echo "   (기본값은 values.yaml, 오버라이드는 .env.k8s 값)"
         helm upgrade ${RELEASE_NAME} openspot \
             --namespace ${NAMESPACE} \
             -f ${VALUES_FILE} \
+            --set "config.frontendBaseUrl=${FRONTEND_BASE_URL}" \
+            --set "config.oauth2RedirectUri=${OAUTH2_REDIRECT_URI}" \
+            --set "config.frontendAuthSuccessPath=${FRONTEND_AUTH_SUCCESS_PATH}" \
+            --set "config.frontendAuthErrorPath=${FRONTEND_AUTH_ERROR_PATH}" \
+            --set "config.postgresHost=${POSTGRES_HOST}" \
+            --set "config.postgresPort=${POSTGRES_PORT}" \
+            --set "config.postgresDb=${POSTGRES_DB}" \
+            --set "config.postgresUser=${POSTGRES_USER}" \
+            --set "config.redisHost=${REDIS_HOST}" \
+            --set "config.redisPort=${REDIS_PORT}" \
+            --set "config.kafkaBootstrapServers=${KAFKA_BOOTSTRAP_SERVERS}" \
+            --set "config.zookeeperConnect=${ZOOKEEPER_CONNECT}" \
+            --set "config.authServiceHost=${AUTH_SERVICE_HOST}" \
+            --set "config.authServicePort=${AUTH_SERVICE_PORT}" \
+            --set "config.locationServiceHost=${LOCATION_SERVICE_HOST}" \
+            --set "config.locationServicePort=${LOCATION_SERVICE_PORT}" \
+            --set "config.notificationServiceHost=${NOTIFICATION_SERVICE_HOST}" \
+            --set "config.notificationServicePort=${NOTIFICATION_SERVICE_PORT}" \
+            --set "config.springCloudConfigUri=${SPRING_CLOUD_CONFIG_URI}" \
             --set "secrets.postgres.password=${POSTGRES_PASSWORD}" \
             --set "secrets.jwt.secret=${JWT_SECRET}" \
             --set "secrets.google.clientId=${GOOGLE_CLIENT_ID}" \
@@ -69,6 +120,7 @@ if helm list -n ${NAMESPACE} | grep -q "^${RELEASE_NAME}"; then
     fi
 else
     echo "📦 Installing Helm release..."
+    echo "   (기본값은 values.yaml, 오버라이드는 .env.k8s 값)"
     # Create namespace if it doesn't exist
     if ! kubectl get namespace ${NAMESPACE} &> /dev/null; then
         echo "Namespace ${NAMESPACE} not found. Creating it..."
@@ -77,6 +129,25 @@ else
     helm install ${RELEASE_NAME} openspot \
         --namespace ${NAMESPACE} \
         -f ${VALUES_FILE} \
+        --set "config.frontendBaseUrl=${FRONTEND_BASE_URL}" \
+        --set "config.oauth2RedirectUri=${OAUTH2_REDIRECT_URI}" \
+        --set "config.frontendAuthSuccessPath=${FRONTEND_AUTH_SUCCESS_PATH}" \
+        --set "config.frontendAuthErrorPath=${FRONTEND_AUTH_ERROR_PATH}" \
+        --set "config.postgresHost=${POSTGRES_HOST}" \
+        --set "config.postgresPort=${POSTGRES_PORT}" \
+        --set "config.postgresDb=${POSTGRES_DB}" \
+        --set "config.postgresUser=${POSTGRES_USER}" \
+        --set "config.redisHost=${REDIS_HOST}" \
+        --set "config.redisPort=${REDIS_PORT}" \
+        --set "config.kafkaBootstrapServers=${KAFKA_BOOTSTRAP_SERVERS}" \
+        --set "config.zookeeperConnect=${ZOOKEEPER_CONNECT}" \
+        --set "config.authServiceHost=${AUTH_SERVICE_HOST}" \
+        --set "config.authServicePort=${AUTH_SERVICE_PORT}" \
+        --set "config.locationServiceHost=${LOCATION_SERVICE_HOST}" \
+        --set "config.locationServicePort=${LOCATION_SERVICE_PORT}" \
+        --set "config.notificationServiceHost=${NOTIFICATION_SERVICE_HOST}" \
+        --set "config.notificationServicePort=${NOTIFICATION_SERVICE_PORT}" \
+        --set "config.springCloudConfigUri=${SPRING_CLOUD_CONFIG_URI}" \
         --set "secrets.postgres.password=${POSTGRES_PASSWORD}" \
         --set "secrets.jwt.secret=${JWT_SECRET}" \
         --set "secrets.google.clientId=${GOOGLE_CLIENT_ID}" \

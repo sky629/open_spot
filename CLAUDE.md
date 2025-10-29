@@ -58,9 +58,14 @@ cp .env.example .env
 # - GOOGLE_CLIENT_ID: Google OAuth2 client ID
 # - GOOGLE_CLIENT_SECRET: Google OAuth2 client secret
 # - JWT_SECRET: Secret key for JWT signing
+# - OAUTH2_REDIRECT_URI: Frontend OAuth2 callback URL
+# Optional:
+# - FRONTEND_BASE_URL: Frontend application URL
+# - REDIS_HOST, REDIS_PORT: Redis connection
+# - KAFKA_BOOTSTRAP_SERVERS: Kafka brokers
 ```
 
-### Local Development (Docker Compose)
+### Quick Start (Local Development with Docker Compose)
 ```bash
 # 1. Start infrastructure + config + gateway (최초 실행)
 ./start-infrastructure.sh
@@ -68,9 +73,16 @@ cp .env.example .env
 # 2. Start domain services
 ./start-services.sh
 
+# 3. Check health (all services should return 200)
+curl http://localhost:8080/api/v1/auth/health
+curl http://localhost:8080/api/v1/locations/health
+```
+
+### Service Management
+```bash
 # 서비스 중지
 ./stop-services.sh          # 도메인 서비스만 중지 (Docker 유지)
-./stop-infrastructure.sh    # Config + Gateway만 중지
+./stop-infrastructure.sh    # Config + Gateway만 중지 (Docker 컨테이너 유지)
 ./stop-all.sh              # 모든 서비스 + Docker 중지
 
 # View service logs
@@ -203,6 +215,17 @@ Spring Cloud Gateway (8080)
 Auth/Location/Notification Services
 ```
 
+### Code Style and Formatting
+```bash
+# Ktlint (Kotlin code formatter)
+./gradlew ktlintFormat           # Auto-format all code
+./gradlew ktlintCheck            # Check formatting without modifying
+
+# Build system
+./gradlew build                  # Build all modules
+./gradlew clean build            # Clean build
+```
+
 ### Individual Service Development
 ```bash
 # Run individual services (module names without number prefixes)
@@ -222,11 +245,8 @@ Auth/Location/Notification Services
 # Continuous TDD development
 ./gradlew :location-service:test --tests="LocationTest" --continuous
 
-# Build and test
-./gradlew build                  # Build all modules
-./gradlew test                   # Test all modules
-./gradlew clean build            # Clean build
-./gradlew :location-service:build  # Build specific service
+# Build specific service only
+./gradlew :location-service:build
 ```
 
 ### Health Check Endpoints
@@ -425,19 +445,39 @@ fun getLocations(pageable: Pageable): ApiResponse<PageResponse<LocationResponse>
 ### Security Configuration
 **인증 방식**: Bearer Token (Access Token) + HttpOnly Cookie (Refresh Token)
 
-각 서비스의 SecurityFilterChain 설정:
-- **Auth Service**:
-  - OAuth2 login (Google)
-  - JWT 발급 (Access Token: Response Body, Refresh Token: HttpOnly Cookie)
-  - Public: health, login endpoints
-- **Gateway Service**:
+#### 인증 흐름 (MSA 표준)
+1. 클라이언트 → Auth Service: `/api/v1/auth/login` (Google OAuth2)
+2. Auth Service → 클라이언트:
+   - Response Body: `{ "accessToken": "...", "refreshToken": "..." }`
+   - HttpOnly Cookie: Refresh Token (HTTPS only)
+3. 클라이언트 → Gateway: `Authorization: Bearer <accessToken>` (모든 요청)
+4. Gateway → 검증: JWT 토큰 검증 (HS256)
+5. Gateway → 내부 서비스: `X-User-Id` 헤더 추가하여 요청 전달
+
+#### 각 서비스의 SecurityFilterChain 설정
+- **Auth Service** (8081):
+  - OAuth2 login endpoint (Google)
+  - JWT 발급 (`/api/v1/auth/login`, `/api/v1/auth/token/refresh`)
+  - Public: `/api/v1/auth/health`, `/api/v1/auth/login/**`
+  - CORS 설정: Frontend 도메인 허용
+
+- **Gateway Service** (8080):
   - OAuth2 Resource Server (Bearer Token 검증)
-  - 검증 성공 시 X-User-Id 헤더 추가하여 내부 서비스로 전달
-  - 라우팅 및 중앙 인증
-- **Location Service**:
-  - Gateway 신뢰 (JWT 검증 없음)
-  - X-User-Id 헤더 기반 사용자 식별
-  - Public: health, categories endpoints
+  - `JwtToHeaderGatewayFilter`: JWT → `X-User-Id` 헤더 변환
+  - 라우팅 및 중앙 인증 담당
+  - Public: health, login endpoints
+  - 모든 라우트에 인증 적용 (health, login 제외)
+
+- **Location Service** (8082):
+  - Gateway 신뢰 (JWT 검증 없음, X-User-Id 헤더 사용)
+  - `@CurrentUserId` 애노테이션으로 사용자 식별
+  - Public: `/api/v1/locations/health`, `/api/v1/categories`
+  - 나머지 API는 X-User-Id 필수
+
+- **Notification Service** (8083):
+  - Gateway 신뢰 (X-User-Id 헤더 사용)
+  - X-User-Id 기반 사용자 식별
+
 - **Common Security**: Disabled by default to prevent FilterChain conflicts
 
 ## Key Implementation Patterns
@@ -626,6 +666,91 @@ class LocationEventPublisher {
 fun handleLocationEvent(event: LocationEvent)
 ```
 
+### Gateway Authentication Filter Pattern
+```kotlin
+// Spring Cloud Gateway의 JwtToHeaderGatewayFilter 구현
+@Component
+class JwtToHeaderGatewayFilter : GlobalFilter {
+    override fun filter(exchange: ServerWebExchange, chain: GatewayFilterChain): Mono<Void> {
+        // 1. Authorization 헤더에서 Bearer token 추출
+        val token = extractToken(exchange.request)
+
+        // 2. JWT 검증 및 userId 추출
+        val userId = jwtTokenProvider.extractUserId(token)
+
+        // 3. X-User-Id 헤더 추가
+        val newRequest = exchange.request.mutate()
+            .header("X-User-Id", userId)
+            .build()
+
+        return chain.filter(exchange.mutate().request(newRequest).build())
+    }
+}
+
+// 내부 서비스에서 사용자 식별
+@RestController
+@RequestMapping("/api/v1/locations")
+class LocationController(
+    private val locationService: LocationApplicationService
+) {
+    @GetMapping
+    fun getLocations(
+        @RequestHeader("X-User-Id") userId: UUID,  // Gateway에서 자동 주입
+        pageable: Pageable
+    ): ApiResponse<Page<LocationResponse>> {
+        return ApiResponse.success(locationService.getLocations(userId, pageable))
+    }
+}
+```
+
+### UUID Generation Strategy
+```kotlin
+// UUIDv7 (Time-Ordered) for better database indexing performance
+// Library: uuid-creator:5.3.7
+val id: UUID = UuidCreator.getTimeOrderedEpoch()
+
+// Benefits over UUIDv4:
+// - Sortable by creation time (better B-tree index performance)
+// - Better database locality (inserts at table end, not scattered)
+// - Reduced index fragmentation in PostgreSQL
+```
+
+### PostGIS Integration Pattern
+```kotlin
+// JPA Entity with Geometry mapping (Hibernate Spatial)
+@Entity
+@Table(name = "locations")
+data class LocationJpaEntity(
+    @Id val id: UUID = UuidCreator.getTimeOrderedEpoch(),
+    @Column(name = "coordinates", columnDefinition = "geometry(Point, 4326)")
+    @JdbcTypeCode(SqlTypes.STRUCT)  // Hibernate 6.4+
+    val coordinates: Point,  // org.locationtech.jts.geom.Point
+    // ...
+)
+
+// Native Query for spatial operations (PostGIS functions unavailable in JPQL)
+@Query(
+    """
+    SELECT * FROM location.locations l
+    WHERE l.user_id = :userId
+    AND ST_DWithin(
+        l.coordinates::geography,
+        ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography,
+        :radiusMeters
+    )
+    ORDER BY ST_Distance(l.coordinates::geography, ...)
+    """,
+    nativeQuery = true
+)
+fun findByCoordinatesWithinRadius(
+    userId: UUID,
+    latitude: Double,
+    longitude: Double,
+    radiusMeters: Double,
+    pageable: Pageable
+): Page<LocationJpaEntity>
+```
+
 ## Database Architecture
 
 ### Single Database with Service Separation
@@ -718,30 +843,89 @@ spring:
     import: "configserver:http://localhost:9999"
 ```
 
-## TDD Development Approach
+## Testing Strategy
 
-### Layer-by-Layer TDD (Per Service)
+### Current Test Coverage
+**Status**: Minimal coverage - currently only 1 integration test file exists
+- `msa-modules/5-location-service/src/test/kotlin/com/kangpark/openspot/location/repository/LocationJpaRepositoryImplTest.kt`
+  - Tests JPQL queries: `findByUserIdAndKeyword()`, `countByUserIdGroupByCategory()`
+  - Validates pagination, case-insensitivity, GROUP BY aggregation with Testcontainers
+  - **High Priority**: Expand test coverage across all layers and services
+
+### Test Dependencies
+```kotlin
+// Core testing libraries (all services)
+testImplementation("org.junit.jupiter:junit-jupiter")
+testImplementation("org.assertj:assertj-core")
+testImplementation("io.mockk:mockk:1.13.10")
+testImplementation("org.springframework.boot:spring-boot-starter-test")
+
+// Location Service (PostGIS + Testcontainers)
+testImplementation("org.testcontainers:postgresql")
+
+// Auth Service (Security)
+testImplementation("org.springframework.security:spring-security-test")
+
+// Notification Service (Kafka)
+testImplementation("org.testcontainers:kafka")
+```
+
+### TDD Development Approach (Recommended Pattern)
+
 Clean Architecture 순서에 따른 TDD 개발:
 
-1. **Domain First**: Pure business logic tests (no Spring context)
+1. **Domain Layer** (No Spring context): Pure business logic tests
    ```bash
+   # Example: Test Location domain entity
    ./gradlew :location-service:test --tests="**/domain/**"
+
+   # Test structure: src/test/kotlin/com/kangpark/openspot/location/domain/entity/LocationTest.kt
+   # - Test immutability via copy() method
+   # - Test validation logic (e.g., rating 0.5-5.0 range)
+   # - Test domain methods (updateEvaluation, deactivate, toggleFavorite)
    ```
 
-2. **Application Layer**: Use case tests with mocked domain repositories
+2. **Application Layer**: Use case tests with mocked repositories
    ```bash
    ./gradlew :location-service:test --tests="**/service/**"
+
+   # Test structure: src/test/kotlin/com/kangpark/openspot/location/service/usecase/
+   # - Mock LocationRepository
+   # - Test CreateLocationUseCase, UpdateLocationUseCase, SearchLocationUseCase
+   # - Verify domain method calls and repository interactions
    ```
 
-3. **Infrastructure Layer**: Integration tests with JPA repositories and Testcontainers
+3. **Infrastructure Layer**: Integration tests with JPA repositories
    ```bash
    ./gradlew :location-service:test --tests="**/repository/**"
+
+   # Use Testcontainers for PostgreSQL (with PostGIS)
+   # Test actual JPA queries: JPQL + Native PostGIS queries
+   # Example: LocationJpaRepositoryImplTest.kt (existing)
    ```
 
 4. **Presentation Layer**: MockMvc tests for HTTP endpoints
    ```bash
    ./gradlew :location-service:test --tests="**/controller/**"
+
+   # Test structure: src/test/kotlin/com/kangpark/openspot/location/controller/
+   # - Mock LocationApplicationService
+   # - Test request/response serialization
+   # - Test error handling and status codes
+   # - Test pagination parameters
    ```
+
+### Continuous Test Development
+```bash
+# Watch for changes and re-run specific test
+./gradlew :location-service:test --tests="LocationTest" --continuous
+
+# Run only domain layer tests with continuous watch
+./gradlew :location-service:test --tests="**/domain/**" --continuous
+
+# Run all tests with coverage report
+./gradlew test --info
+```
 
 ### Clean Architecture Testing Strategy
 ```kotlin
@@ -911,6 +1095,21 @@ override fun countByUserIdGroupByCategory(userId: UUID): Map<UUID, Long> {
 - ✅ 안전성: 동적 조건 구성 시 타입 검증
 - ✅ 성능: SQL로 변환되어 네이티브 쿼리와 동일
 
+#### Gradle Build Issues
+- **Slow builds**: `org.gradle.parallel=true` and `org.gradle.workers.max=N` in gradle.properties
+- **Out of memory during build**: Increase heap size in `gradle.properties`: `org.gradle.jvmargs=-Xmx2g`
+- **Module not found errors**: Ensure `settings.gradle.kts` declares all modules correctly
+  - Module names in Gradle commands must match project names (without number prefixes)
+  - Example: `:auth-service` (not `:4-auth-service`)
+
+#### Testing Issues
+- **Testcontainers startup timeout**: PostgreSQL with PostGIS can be slow on first run
+  - Increase startup timeout: `testcontainers.properties`
+  - Use reusable containers in local development: `@Testcontainers(disabledWithoutDocker = true)`
+- **Mockk mocking not working**: Ensure `mockk` version matches kotlin version
+  - Current: mockk 1.13.10+ compatible with Kotlin 1.9.25
+- **Spring context not loading in tests**: Annotate with `@SpringBootTest` (loads context) or `@DataJpaTest` (JPA only)
+
 #### Kubernetes Issues
 - **Redis Health Check 실패**: auth-service, location-service에서 Redis 헬스 체크 비활성화됨
   - 설정: `management.health.redis.enabled: false` in config YAML
@@ -922,6 +1121,15 @@ override fun countByUserIdGroupByCategory(userId: UUID): Map<UUID, Long> {
   - 권장값: Config Service (90s), Domain Services (120s)
 - **Ingress 포트 80 응답 안 함**: Kubernetes 클러스터 내부 네트워크 문제
   - 대안: `kubectl port-forward` 또는 NodePort 직접 접근 사용
+
+#### Spring Cloud Config Issues
+- **Config Service not updating**: Clear config client cache
+  ```bash
+  # Restart the service or trigger refresh
+  curl -X POST http://localhost:8081/actuator/refresh
+  ```
+- **Profile-specific configs not loading**: Ensure `spring.profiles.active` is set in bootstrap.yml
+- **Secrets not being decrypted**: Verify encryption key in application properties
 
 ### Service Dependencies
 Services must start in order:
@@ -1049,6 +1257,84 @@ http://localhost:8080/notifications/swagger-ui.html
 2. Gateway: JWT 검증 (HS256 알고리즘)
 3. Gateway: 검증 성공 시 `X-User-Id` 헤더 추가
 4. 내부 서비스: `X-User-Id` 헤더로 사용자 식별 (JWT 검증 불필요)
+
+## Kotlin Coding Patterns
+
+### Immutable Data Classes (Domain Entities)
+```kotlin
+// ✅ Preferred: Data class with val properties (immutable)
+data class Location(
+    val userId: UUID,
+    val name: String,
+    val rating: Double? = null,
+    val baseEntity: BaseEntity = BaseEntity()
+) {
+    // Convenience properties for baseEntity access
+    val id: UUID get() = baseEntity.id
+    val createdAt: LocalDateTime get() = baseEntity.createdAt
+
+    // Pure functions that return new instances
+    fun updateName(newName: String): Location = copy(name = newName)
+
+    // Validation in methods
+    fun updateRating(newRating: Double): Location {
+        require(newRating in 0.5..5.0 step 0.5) { "평점은 0.5~5.0 범위의 0.5 단위여야 합니다" }
+        return copy(rating = newRating)
+    }
+}
+```
+
+### Scope Functions for Object Initialization
+```kotlin
+// Use apply for builder-like initialization
+val location = Location(
+    userId = userId,
+    name = name,
+    baseEntity = BaseEntity()
+).apply {
+    // If multiple operations needed (rare for immutable data classes)
+}
+
+// Use let for null-safe transformations
+val domain = jpaEntity?.let { it.toDomain() }
+    ?: throw LocationNotFoundException()
+```
+
+### Extension Functions for Domain Logic
+```kotlin
+// Extension function pattern (used in services)
+fun <T> Result<T>.getOrThrow(): T = getOrNull() ?: throw Exception()
+
+// Validation extensions
+fun Double.isValidRating(): Boolean = this in 0.5..5.0
+```
+
+### Lazy Properties for Expensive Operations
+```kotlin
+// Use lazy only if operation is expensive and used multiple times
+val cachedLocationCount: Int by lazy {
+    locationRepository.countByUserId(userId)
+}
+```
+
+### When Expression for Type Handling
+```kotlin
+// Better than if-else for sealed classes or multiple cases
+return when (error) {
+    is LocationNotFoundException -> ApiResponse.error("LOCATION_NOT_FOUND", "장소를 찾을 수 없습니다")
+    is UnauthorizedException -> ApiResponse.error("UNAUTHORIZED", "접근 권한이 없습니다")
+    else -> ApiResponse.error("INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다")
+}
+```
+
+### Destructuring for Data Classes
+```kotlin
+// Use destructuring in loops and assignments
+val (lat, lon) = coordinates  // If Coordinates has component1, component2
+
+// In function parameters (when appropriate)
+locations.forEach { (id, name) -> println("$id: $name") }
+```
 
 ## 핵심 설계 원칙
 

@@ -1,7 +1,15 @@
 #!/bin/bash
 set -e
 
+# ========================================================================
+# Script Path Detection
+# 스크립트 위치를 기반으로 프로젝트 루트 자동 탐지
+# ========================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 echo "🚀 Starting minikube tunnel in background..."
+echo "📂 Project Root: $PROJECT_ROOT"
 
 CLUSTER_NAME="openspot"
 PID_FILE="/tmp/minikube-tunnel-${CLUSTER_NAME}.pid"
@@ -12,7 +20,7 @@ if [ -f "$PID_FILE" ]; then
     OLD_PID=$(cat "$PID_FILE")
     if kill -0 "$OLD_PID" 2>/dev/null; then
         echo "⚠️  Tunnel is already running (PID: $OLD_PID)"
-        echo "💡 To stop it, run: ./6-stop-tunnel.sh"
+        echo "💡 To stop it, run: sh k8s/scripts/6-stop-tunnel.sh"
         exit 0
     else
         echo "🗑️  Cleaning up stale PID file..."
@@ -44,7 +52,7 @@ echo "💡 To view logs:"
 echo "  tail -f $LOG_FILE"
 echo ""
 echo "💡 To stop tunnel:"
-echo "  ./6-stop-tunnel.sh"
+echo "  sh k8s/scripts/6-stop-tunnel.sh"
 echo ""
 
 # Wait a moment and check if process is still running

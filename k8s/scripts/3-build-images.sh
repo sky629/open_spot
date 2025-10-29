@@ -1,10 +1,17 @@
 #!/bin/bash
 set -e
 
+# ========================================================================
+# Script Path Detection
+# 스크립트 위치를 기반으로 프로젝트 루트 자동 탐지
+# ========================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 echo "🐳 Building Docker Images for Minikube..."
+echo "📂 Project Root: $PROJECT_ROOT"
 
 CLUSTER_NAME="openspot"
-PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
@@ -26,7 +33,7 @@ NC='\033[0m' # No Color
 # Minikube가 실행 중인지 확인
 if ! minikube status -p "$CLUSTER_NAME" &>/dev/null; then
     echo -e "${RED}❌ Minikube cluster '$CLUSTER_NAME' is not running${NC}"
-    echo "Please run: ./2-create-cluster.sh"
+    echo "Please run: sh k8s/scripts/2-create-cluster.sh"
     exit 1
 fi
 
@@ -89,7 +96,7 @@ echo -e "${YELLOW}📋 Images loaded in Minikube cluster:${NC}"
 minikube image ls -p "$CLUSTER_NAME" | grep openspot || echo "No openspot images found"
 
 echo ""
-echo -e "${GREEN}💡 Next step: Run ./4-deploy.sh to deploy services${NC}"
+echo -e "${GREEN}💡 Next step: Run sh k8s/scripts/4-deploy.sh to deploy services${NC}"
 echo ""
 echo -e "${YELLOW}💡 Useful commands:${NC}"
 echo "   - Rebuild single image: docker build -t openspot/service:latest -f msa-modules/N-service/Dockerfile ."
