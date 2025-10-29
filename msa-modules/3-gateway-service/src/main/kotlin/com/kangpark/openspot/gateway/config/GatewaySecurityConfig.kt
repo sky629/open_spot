@@ -29,6 +29,9 @@ open class GatewaySecurityConfig(
     @Value("\${jwt.secret}")
     private lateinit var jwtSecret: String
 
+    @Value("\${app.frontend.base-url}")
+    private lateinit var frontendBaseUrl: String
+
     @Bean
     open fun gatewaySecurityFilterChain(http: HttpSecurity): SecurityFilterChain {
         return http
@@ -79,10 +82,18 @@ open class GatewaySecurityConfig(
     @Bean
     open fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration()
-        configuration.allowedOrigins = listOf(
+
+        // Build allowed origins dynamically
+        val allowedOrigins = mutableListOf(
             "http://localhost:3000", // 로컬 프론트엔드 개발 서버
-            "https://open-spot.com" // 실제 프로덕션 프론트엔드 도메인
         )
+
+        // Add production frontend URL if it's different from localhost
+        if (frontendBaseUrl != "http://localhost:3000") {
+            allowedOrigins.add(frontendBaseUrl)
+        }
+
+        configuration.allowedOrigins = allowedOrigins.distinct()
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
         configuration.allowedHeaders = listOf("*")
         configuration.allowCredentials = true

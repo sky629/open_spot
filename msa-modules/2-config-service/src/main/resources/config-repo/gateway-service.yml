@@ -8,6 +8,10 @@ spring:
         - name: ForwardedHeaders
         - name: PreserveHostHeader
 
+app:
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+
 jwt:
   secret: ${JWT_SECRET:open-spot-jwt-secret-key-for-local-development-change-in-production}
   access-token-expiration: 3600000    # Access Token: 1시간 (밀리초)
