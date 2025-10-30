@@ -1,28 +1,8 @@
-# CLAUDE.md
+# CLAUDE.md - Open-Spot Project Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+**Open-Spot**: Map-based location sharing platform with personal ratings. Spring Boot 3.5.5, Kotlin, Clean Architecture.
 
-## Project Overview
-
-**Open-Spot** is a map-based location sharing platform where users can record ratings and information about places they've visited. Built with Spring Boot 3.5.5, Kotlin, and Clean Architecture principles.
-
-### Purpose
-사용자가 방문한 장소에 대한 개인적인 평점과 정보를 기록하고 관리하는 지도 기반 위치 공유 서비스입니다. 장소들을 그룹으로 관리할 수 있으며, 추후 친구들과 방문 장소 그룹을 공유할 수 있는 소셜 기능이 추가될 예정입니다.
-
-### Core Features
-- **개인 장소 기록**: 사용자가 원하는 위치에 평점과 정보를 기록하고 관리
-- **그룹 관리**: 방문한 장소들을 사용자 정의 그룹으로 분류하여 체계적으로 관리
-- **지도 기반 검색**: PostGIS 공간 쿼리로 내 주변 또는 특정 반경 내 기록된 장소 검색
-- **개인 평가**: 각 장소에 대한 평점, 리뷰, 태그 기록
-- **카테고리 분류**: 음식점, 카페, 관광지 등 사전 정의된 카테고리로 장소 분류
-- **소셜 공유 (예정)**: 친구들과 장소 그룹 및 추천 공유
-
-### Technical Features
-- **위치 기반 서비스**: PostGIS를 활용한 공간 쿼리 (반경 내 장소 검색, 거리 계산)
-- **사용자 인증**: Google OAuth2 + JWT 기반 인증
-- **실시간 알림**: Kafka 기반 이벤트 처리
-- **API 문서화**: Swagger UI를 통한 한국어 API 문서 제공
-- **캐싱**: Redis를 활용한 성능 최적화
+**Tech Stack**: PostgreSQL 15.4 + PostGIS, Redis 7.2, Kafka 7.4, Google OAuth2, JWT, UUIDv7, KotlinJDSL 3.5.0
 
 ## Architecture Overview
 
@@ -118,102 +98,11 @@ curl http://localhost:8080/api/v1/locations/health
 ./7-cleanup.sh
 ```
 
-### Cloudflare 프로덕션 배포 (HTTPS + Origin 인증서)
-
-**목표**: `https://api.kang-labs.com`을 내 컴퓨터의 Kubernetes Gateway로 연결
-
-#### 전제 조건
-```bash
-# 1. Cloudflare Origin 인증서 발급 및 다운로드
-# - Cloudflare 대시보드 → SSL/TLS → Origin Server
-# - 인증서 생성 및 다운로드:
-#   - Origin Certificate: kang-labs_origin_cert.pem
-#   - Private Key: kang-labs_private.key
-# - origin_cert/ 폴더에 저장
-
-# 2. .env 설정
-cp .env.example .env
-# GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET 입력
-
-# 3. 공유기 포트포워딩 설정 (사전 설정)
-# - 프로토콜: TCP
-# - 외부 포트: 443 (HTTPS)
-# - 내부 호스트: 컴퓨터 IP (예: 192.168.1.100)
-# - 내부 포트: 443
-```
-
-#### 배포 순서
-```bash
-# 1. Minikube 클러스터 생성 (Helm Ingress 자동 설치)
-cd k8s/scripts
-./2-create-cluster.sh
-# → Nginx Ingress Controller가 LoadBalancer 타입으로 설치됨
-# → HTTPS 포트 443 자동 활성화
-
-# 2. Docker 이미지 빌드
-./3-build-images.sh
-
-# 3. Kubernetes에 배포 (자동으로 Origin 인증서 로드)
-./4-deploy.sh
-# → origin_cert/ 폴더에서 인증서 자동 감지
-# → cloudflare-origin-tls Secret 생성
-# → Ingress에 TLS 설정 자동 적용
-
-# 4. Minikube tunnel 실행 (다른 터미널)
-./5-start-tunnel.sh
-# → Localhost:443에서 Ingress 접근 가능
-
-# 5. 배포 확인
-kubectl get pods -n openspot
-kubectl get ingress -n openspot
-kubectl get secret -n openspot | grep cloudflare
-```
-
-#### HTTPS 테스트
-```bash
-# 로컬 테스트 (host 헤더 필요)
-curl -H "Host: openspot.local" https://localhost/api/v1/auth/health
-curl -H "Host: api.kang-labs.com" https://localhost/api/v1/auth/health
-
-# 공개 테스트 (Cloudflare DNS 설정 후)
-curl https://api.kang-labs.com/api/v1/auth/health
-```
-
-#### Cloudflare SSL/TLS 설정
-```
-대시보드 → SSL/TLS → 개요
-- 암호화 모드: Full (strict) 선택
-  ✅ End-to-End HTTPS 암호화 (브라우저 ↔ Cloudflare ↔ 서버)
-```
-
-#### 아키텍처 흐름
-```
-브라우저 (HTTPS 443)
-    ↓
-Cloudflare (api.kang-labs.com)
-    ↓ Full (strict) SSL
-공유기 포트포워딩 (443:443)
-    ↓
-Nginx Ingress Controller (HTTPS, LoadBalancer)
-    ↓ TLS Termination (Cloudflare Origin 인증서)
-    ↓ HTTP
-Gateway Service (8080)
-```
-
-**흐름도**:
-```
-브라우저/프론트엔드
-    ↓ https://api.kang-labs.com
-Cloudflare DNS (A 레코드)
-    ↓ 203.0.113.42 (공인 IP)
-공유기 포트포워딩 (443 → 컴퓨터:8080)
-    ↓ http://localhost:8080
-Minikube LoadBalancer (gateway-service)
-    ↓
-Spring Cloud Gateway (8080)
-    ↓
-Auth/Location/Notification Services
-```
+### Cloudflare Production Deployment (HTTPS)
+1. Cert: origin_cert/ (Cloudflare Origin SSL)
+2. K8s: `./k8s/scripts/2-create-cluster.sh` → `./3-build-images.sh` → `./4-deploy.sh`
+3. Tunnel: `./5-start-tunnel.sh` (Minikube → localhost:443)
+4. Flow: Browser → Cloudflare → Router (443:443) → Nginx Ingress (HTTPS) → Gateway (8080)
 
 ### Code Style and Formatting
 ```bash
@@ -318,102 +207,6 @@ open_spot/
     └── vo/                     # Value objects and enums
 ```
 
-### Dependency Flow
-```
-Presentation → Application → Domain ← Infrastructure
-```
-- **Domain Layer**: Pure business logic, no external dependencies, immutable entities
-- **Application Layer**: Use cases, depends only on Domain interfaces
-- **Infrastructure Layer**: Implements Domain interfaces, handles DB mapping via JPA entities
-- **Presentation Layer**: HTTP controllers, depends on Application layer
-
-### Entity Architecture Pattern (Domain/JPA Separation)
-```kotlin
-// Domain Entity (pure business logic) - BaseEntity 합성 패턴
-data class Location(
-    val userId: UUID,
-    val name: String,
-    val description: String? = null,
-    val categoryId: UUID,
-    val coordinates: Coordinates,
-    val rating: Double? = null,              // 0.5-5.0 개인 평점
-    val review: String? = null,
-    val tags: List<String> = emptyList(),
-    val groupId: UUID? = null,
-    val isActive: Boolean = true,
-    val baseEntity: BaseEntity = BaseEntity()  // 합성 (상속 대신)
-) {
-    // 편의 프로퍼티로 BaseEntity 필드 접근
-    val id: UUID get() = baseEntity.id
-    val createdAt: LocalDateTime get() = baseEntity.createdAt
-    val updatedAt: LocalDateTime get() = baseEntity.updatedAt
-
-    fun updateEvaluation(rating: Double?, review: String?, tags: List<String>): Location {
-        require(rating == null || (rating >= 0.5 && rating <= 5.0)) { "평점은 0.5-5.0 사이여야 합니다" }
-        return copy(
-            rating = rating,
-            review = review,
-            tags = tags,
-            baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now())
-        )
-    }
-
-    companion object {
-        fun create(userId: UUID, name: String, /* ... */): Location {
-            // 팩토리 메서드로 생성
-        }
-    }
-}
-
-// JPA Entity (database mapping)
-@Entity
-@Table(name = "locations", schema = "location")
-data class LocationJpaEntity(
-    @Id @UuidGenerator val id: UUID? = null,
-    @Column(name = "user_id", nullable = false) val userId: UUID,
-    @Column(name = "name", nullable = false, length = 100) val name: String,
-    // ... JPA annotations and mappings
-) {
-    fun toDomain(): Location {
-        return Location(/* conversion */).copy(
-            baseEntity = BaseEntity(id = this.id!!, createdAt = this.createdAt, updatedAt = this.updatedAt)
-        )
-    }
-
-    companion object {
-        fun fromDomain(location: Location): LocationJpaEntity {
-            return LocationJpaEntity(
-                id = location.id,
-                userId = location.userId,
-                name = location.name,
-                // ...
-            )
-        }
-    }
-}
-```
-
-### Repository Pattern (Domain/Infrastructure Separation)
-```kotlin
-// Domain repository interface (pure business contract)
-interface LocationRepository {
-    fun save(location: Location): Location
-    fun findById(id: UUID): Location?
-    fun findByCoordinatesWithinRadius(latitude: Double, longitude: Double, radiusMeters: Double): List<Location>
-}
-
-// Infrastructure implementation (JPA bridge)
-@Repository
-class LocationRepositoryImpl(
-    private val jpaRepository: LocationJpaRepository
-) : LocationRepository {
-    override fun save(location: Location): Location {
-        val jpaEntity = LocationJpaEntity.fromDomain(location)
-        val saved = jpaRepository.save(jpaEntity)
-        return saved.toDomain()
-    }
-}
-```
 
 ### Common Module Usage
 ```kotlin
@@ -482,274 +275,56 @@ fun getLocations(pageable: Pageable): ApiResponse<PageResponse<LocationResponse>
 
 ## Key Implementation Patterns
 
-### Domain-Driven Design with Clean Architecture
+### Clean Architecture Layer Pattern
+- **Domain**: Pure business logic (immutable data classes, interfaces)
+- **Application**: Use cases, service orchestration (depends only on Domain)
+- **Infrastructure**: JPA repos, implementations (depends on Domain interfaces)
+- **Presentation**: HTTP controllers, DTOs (depends on Application)
+
+**Entity Pattern**: Domain Entity (data class + composition) ↔ JPA Entity (DB mapping)
 ```kotlin
-// 1. Pure Domain Entity (no external dependencies) - BaseEntity 합성 패턴
-data class Location(
-    val userId: UUID,                        // 소유자
-    val name: String,
-    val description: String? = null,
-    val address: String? = null,
-    val categoryId: UUID,
-    val coordinates: Coordinates,
-    val iconUrl: String? = null,
-
-    // 개인 평가 정보
-    val rating: Double? = null,              // 0.5-5.0 개인 평점 (0.5 단위)
-    val review: String? = null,
-    val tags: List<String> = emptyList(),
-    val isFavorite: Boolean = false,         // 즐겨찾기 여부
-
-    // 그룹 관리
-    val groupId: UUID? = null,
-
-    val isActive: Boolean = true,
-
-    // BaseEntity 합성 (상속 대신 합성 사용)
-    val baseEntity: BaseEntity = BaseEntity()
-) {
-    // 편의 프로퍼티로 BaseEntity 필드 접근
+// Domain: Pure logic
+data class Location(val userId: UUID, val name: String, val baseEntity: BaseEntity = BaseEntity()) {
     val id: UUID get() = baseEntity.id
-    val createdAt: LocalDateTime get() = baseEntity.createdAt
-    val updatedAt: LocalDateTime get() = baseEntity.updatedAt
-
     fun updateEvaluation(rating: Double?, review: String?, tags: List<String>): Location {
-        rating?.let {
-            require(it >= 0.5 && it <= 5.0) { "평점은 0.5-5.0 사이의 값이어야 합니다" }
-            require(it % 0.5 == 0.0) { "평점은 0.5 단위여야 합니다" }
-        }
-        return copy(
-            rating = rating,
-            review = review,
-            tags = tags,
-            baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now())
-        )
-    }
-
-    fun deactivate(): Location {
-        return copy(
-            isActive = false,
-            baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now())
-        )
-    }
-
-    fun toggleFavorite(): Location {
-        return copy(
-            isFavorite = !isFavorite,
-            baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now())
-        )
-    }
-
-    // 도메인 검증 로직
-    fun isOwnedBy(checkUserId: UUID): Boolean = userId == checkUserId
-    fun belongsToGroup(checkGroupId: UUID): Boolean = groupId == checkGroupId
-}
-
-// 2. JPA Entity for Database Mapping
-@Entity
-@Table(name = "locations", schema = "location")
-data class LocationJpaEntity(
-    @Id @UuidGenerator(style = UuidGenerator.Style.TIME) val id: UUID? = null,
-    @Column(name = "user_id", nullable = false) val userId: UUID,
-    @Column(name = "name", nullable = false, length = 100) val name: String,
-    @Column(name = "description", length = 1000) val description: String? = null,
-    @Column(name = "address", length = 200) val address: String? = null,
-    @Column(name = "category_id", nullable = false) val categoryId: UUID,
-    @Column(name = "latitude", nullable = false) val latitude: Double,
-    @Column(name = "longitude", nullable = false) val longitude: Double,
-    @Column(name = "icon_url", length = 500) val iconUrl: String? = null,
-    @Column(name = "rating") val rating: Double? = null,
-    @Column(name = "review", length = 2000) val review: String? = null,
-    @Column(name = "tags") @Convert(converter = StringListConverter::class) val tags: List<String> = emptyList(),
-    @Column(name = "is_favorite", nullable = false) val isFavorite: Boolean = false,
-    @Column(name = "group_id") val groupId: UUID? = null,
-    @Column(name = "is_active", nullable = false) val isActive: Boolean = true,
-    @CreatedDate @Column(name = "created_at", nullable = false, updatable = false) val createdAt: LocalDateTime = LocalDateTime.now(),
-    @LastModifiedDate @Column(name = "updated_at", nullable = false) val updatedAt: LocalDateTime = LocalDateTime.now()
-) {
-    fun toDomain(): Location {
-        return Location(
-            userId = userId,
-            name = name,
-            description = description,
-            address = address,
-            categoryId = categoryId,
-            coordinates = Coordinates(latitude, longitude),
-            iconUrl = iconUrl,
-            rating = rating,
-            review = review,
-            tags = tags,
-            isFavorite = isFavorite,
-            groupId = groupId,
-            isActive = isActive,
-            baseEntity = BaseEntity(id = id!!, createdAt = createdAt, updatedAt = updatedAt)
-        )
-    }
-
-    companion object {
-        fun fromDomain(location: Location): LocationJpaEntity {
-            return LocationJpaEntity(
-                id = location.id,
-                userId = location.userId,
-                name = location.name,
-                description = location.description,
-                address = location.address,
-                categoryId = location.categoryId,
-                latitude = location.coordinates.latitude,
-                longitude = location.coordinates.longitude,
-                iconUrl = location.iconUrl,
-                rating = location.rating,
-                review = location.review,
-                tags = location.tags,
-                isFavorite = location.isFavorite,
-                groupId = location.groupId,
-                isActive = location.isActive,
-                createdAt = location.createdAt,
-                updatedAt = location.updatedAt
-            )
-        }
+        require(rating == null || (rating >= 0.5 && rating <= 5.0)) { "평점 범위: 0.5-5.0" }
+        return copy(rating = rating, review = review, tags = tags,
+                   baseEntity = baseEntity.copy(updatedAt = LocalDateTime.now()))
     }
 }
 
-// 3. Repository Interface (Domain Layer)
-interface LocationRepository {
-    fun save(location: Location): Location
-    fun findById(id: UUID): Location?
-    fun findByCoordinatesWithinRadius(latitude: Double, longitude: Double, radiusMeters: Double, category: CategoryType?, pageable: Pageable): Page<Location>
-    fun findByCreatedBy(userId: UUID, pageable: Pageable): Page<Location>
-    fun findPopularLocations(pageable: Pageable): Page<Location>
+// Conversion: Domain ↔ JPA (via toDomain()/fromDomain())
+@Entity @Table(name = "locations", schema = "location")
+data class LocationJpaEntity(...) {
+    fun toDomain() = Location(userId, name, ..., baseEntity = BaseEntity(id!!, createdAt, updatedAt))
+    companion object { fun fromDomain(location: Location) = LocationJpaEntity(...) }
 }
 
-// 4. Repository Implementation (Infrastructure Layer)
-@Repository
-class LocationRepositoryImpl(
-    private val jpaRepository: LocationJpaRepository
-) : LocationRepository {
-
-    override fun save(location: Location): Location {
-        val jpaEntity = LocationJpaEntity.fromDomain(location)
-        val saved = jpaRepository.save(jpaEntity)
-        return saved.toDomain()
-    }
-
-    override fun findByCoordinatesWithinRadius(
-        latitude: Double, longitude: Double, radiusMeters: Double,
-        category: CategoryType?, pageable: Pageable
-    ): Page<Location> {
-        val jpaPage = jpaRepository.findByCoordinatesWithinRadius(latitude, longitude, radiusMeters, category, pageable)
-        return jpaPage.map { it.toDomain() }
-    }
+// Repository: Domain interface → JPA implementation
+interface LocationRepository { fun save(location: Location): Location }
+@Repository class LocationRepositoryImpl(private val jpaRepo: LocationJpaRepository) : LocationRepository {
+    override fun save(location: Location) = jpaRepo.save(LocationJpaEntity.fromDomain(location)).toDomain()
 }
 ```
 
-### Circuit Breaker (External API Protection)
+### Security: JWT + Headers
+- **Auth Service** (8081): Issues JWT tokens (Google OAuth2)
+- **Gateway** (8080): Validates JWT, injects `X-User-Id` header
+- **Internal Services**: Trust Gateway, use `@RequestHeader("X-User-Id")` for user identification
 ```kotlin
-// Auth service → Google OAuth2 API
-@CircuitBreaker(name = "google-oauth")
-@Retry(name = "google-oauth")  
-@TimeLimiter(name = "google-oauth")
-fun authenticateWithGoogle(token: String): GoogleUserInfo
-```
-
-### Event-Driven Communication (Kafka)
-```kotlin
-// Location service publishes events
-@Component
-class LocationEventPublisher {
-    fun publishLocationCreated(location: Location) {
-        kafkaTemplate.send("location-events", LocationCreatedEvent(location))
-    }
-}
-
-// Notification service consumes events
-@KafkaListener(topics = ["location-events"])
-fun handleLocationEvent(event: LocationEvent)
-```
-
-### Gateway Authentication Filter Pattern
-```kotlin
-// Spring Cloud Gateway의 JwtToHeaderGatewayFilter 구현
-@Component
-class JwtToHeaderGatewayFilter : GlobalFilter {
+@Component class JwtToHeaderGatewayFilter : GlobalFilter {
     override fun filter(exchange: ServerWebExchange, chain: GatewayFilterChain): Mono<Void> {
-        // 1. Authorization 헤더에서 Bearer token 추출
-        val token = extractToken(exchange.request)
-
-        // 2. JWT 검증 및 userId 추출
-        val userId = jwtTokenProvider.extractUserId(token)
-
-        // 3. X-User-Id 헤더 추가
-        val newRequest = exchange.request.mutate()
-            .header("X-User-Id", userId)
-            .build()
-
-        return chain.filter(exchange.mutate().request(newRequest).build())
-    }
-}
-
-// 내부 서비스에서 사용자 식별
-@RestController
-@RequestMapping("/api/v1/locations")
-class LocationController(
-    private val locationService: LocationApplicationService
-) {
-    @GetMapping
-    fun getLocations(
-        @RequestHeader("X-User-Id") userId: UUID,  // Gateway에서 자동 주입
-        pageable: Pageable
-    ): ApiResponse<Page<LocationResponse>> {
-        return ApiResponse.success(locationService.getLocations(userId, pageable))
+        val userId = jwtTokenProvider.extractUserId(extractToken(exchange.request))
+        return chain.filter(exchange.mutate().request(
+            exchange.request.mutate().header("X-User-Id", userId).build()).build())
     }
 }
 ```
 
-### UUID Generation Strategy
-```kotlin
-// UUIDv7 (Time-Ordered) for better database indexing performance
-// Library: uuid-creator:5.3.7
-val id: UUID = UuidCreator.getTimeOrderedEpoch()
-
-// Benefits over UUIDv4:
-// - Sortable by creation time (better B-tree index performance)
-// - Better database locality (inserts at table end, not scattered)
-// - Reduced index fragmentation in PostgreSQL
-```
-
-### PostGIS Integration Pattern
-```kotlin
-// JPA Entity with Geometry mapping (Hibernate Spatial)
-@Entity
-@Table(name = "locations")
-data class LocationJpaEntity(
-    @Id val id: UUID = UuidCreator.getTimeOrderedEpoch(),
-    @Column(name = "coordinates", columnDefinition = "geometry(Point, 4326)")
-    @JdbcTypeCode(SqlTypes.STRUCT)  // Hibernate 6.4+
-    val coordinates: Point,  // org.locationtech.jts.geom.Point
-    // ...
-)
-
-// Native Query for spatial operations (PostGIS functions unavailable in JPQL)
-@Query(
-    """
-    SELECT * FROM location.locations l
-    WHERE l.user_id = :userId
-    AND ST_DWithin(
-        l.coordinates::geography,
-        ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography,
-        :radiusMeters
-    )
-    ORDER BY ST_Distance(l.coordinates::geography, ...)
-    """,
-    nativeQuery = true
-)
-fun findByCoordinatesWithinRadius(
-    userId: UUID,
-    latitude: Double,
-    longitude: Double,
-    radiusMeters: Double,
-    pageable: Pageable
-): Page<LocationJpaEntity>
-```
+### Databases
+- **KotlinJDSL** (3.5.0): Type-safe JPQL for keyword search, GROUP BY aggregations
+- **Native Query**: PostGIS spatial functions (ST_DWithin, ST_Distance) - JPQL doesn't support these
+- **UUIDv7**: Time-ordered, better B-tree indexing than UUIDv4
 
 ## Database Architecture
 
@@ -1258,132 +833,14 @@ http://localhost:8080/notifications/swagger-ui.html
 3. Gateway: 검증 성공 시 `X-User-Id` 헤더 추가
 4. 내부 서비스: `X-User-Id` 헤더로 사용자 식별 (JWT 검증 불필요)
 
-## Kotlin Coding Patterns
+## Kotlin Patterns
+- **Data Classes**: Immutable (val), use copy() for updates, validation in methods
+- **Null Safety**: let/elvis (jpaEntity?.let { it.toDomain() } ?: throw Exception())
+- **When Expression**: Better than if-else for sealed classes/errors
 
-### Immutable Data Classes (Domain Entities)
-```kotlin
-// ✅ Preferred: Data class with val properties (immutable)
-data class Location(
-    val userId: UUID,
-    val name: String,
-    val rating: Double? = null,
-    val baseEntity: BaseEntity = BaseEntity()
-) {
-    // Convenience properties for baseEntity access
-    val id: UUID get() = baseEntity.id
-    val createdAt: LocalDateTime get() = baseEntity.createdAt
-
-    // Pure functions that return new instances
-    fun updateName(newName: String): Location = copy(name = newName)
-
-    // Validation in methods
-    fun updateRating(newRating: Double): Location {
-        require(newRating in 0.5..5.0 step 0.5) { "평점은 0.5~5.0 범위의 0.5 단위여야 합니다" }
-        return copy(rating = newRating)
-    }
-}
-```
-
-### Scope Functions for Object Initialization
-```kotlin
-// Use apply for builder-like initialization
-val location = Location(
-    userId = userId,
-    name = name,
-    baseEntity = BaseEntity()
-).apply {
-    // If multiple operations needed (rare for immutable data classes)
-}
-
-// Use let for null-safe transformations
-val domain = jpaEntity?.let { it.toDomain() }
-    ?: throw LocationNotFoundException()
-```
-
-### Extension Functions for Domain Logic
-```kotlin
-// Extension function pattern (used in services)
-fun <T> Result<T>.getOrThrow(): T = getOrNull() ?: throw Exception()
-
-// Validation extensions
-fun Double.isValidRating(): Boolean = this in 0.5..5.0
-```
-
-### Lazy Properties for Expensive Operations
-```kotlin
-// Use lazy only if operation is expensive and used multiple times
-val cachedLocationCount: Int by lazy {
-    locationRepository.countByUserId(userId)
-}
-```
-
-### When Expression for Type Handling
-```kotlin
-// Better than if-else for sealed classes or multiple cases
-return when (error) {
-    is LocationNotFoundException -> ApiResponse.error("LOCATION_NOT_FOUND", "장소를 찾을 수 없습니다")
-    is UnauthorizedException -> ApiResponse.error("UNAUTHORIZED", "접근 권한이 없습니다")
-    else -> ApiResponse.error("INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다")
-}
-```
-
-### Destructuring for Data Classes
-```kotlin
-// Use destructuring in loops and assignments
-val (lat, lon) = coordinates  // If Coordinates has component1, component2
-
-// In function parameters (when appropriate)
-locations.forEach { (id, name) -> println("$id: $name") }
-```
-
-## 핵심 설계 원칙
-
-### 1. Domain Entity는 Data Class + Composition 패턴
-- **상속 대신 합성**: `BaseEntity`를 상속하지 않고 합성으로 사용
-- **불변성**: `data class`와 `copy()` 메서드로 불변 객체 패턴 적용
-- **순수 함수**: 모든 도메인 메서드는 새 객체를 반환 (side-effect 없음)
-
-```kotlin
-// ✅ Good: Composition pattern
-data class Location(
-    val name: String,
-    val baseEntity: BaseEntity = BaseEntity()
-) {
-    val id: UUID get() = baseEntity.id
-    fun updateName(newName: String) = copy(name = newName)
-}
-
-// ❌ Bad: Inheritance pattern
-class Location(val name: String) : BaseEntity() {
-    fun updateName(newName: String) {
-        this.name = newName  // mutable
-    }
-}
-```
-
-### 2. JPA Entity는 별도 패키지에 완전 분리
-- **Domain Entity**: `domain/entity/` - 순수 비즈니스 로직
-- **JPA Entity**: `repository/jpa/entity/` - DB 매핑 전용
-- **변환 책임**: JPA Entity가 Domain Entity로의 변환 책임
-
-### 3. Repository 3-Layer 구조
-```
-domain/repository/LocationRepository.kt         # Interface (Domain Layer)
-repository/jpa/LocationJpaRepository.kt         # Spring Data JPA (Infrastructure)
-repository/impl/LocationRepositoryImpl.kt       # Implementation (Infrastructure)
-```
-
-### 4. Use Case 단위 서비스 설계
-각 Use Case를 독립적인 클래스로 분리:
-```
-service/usecase/CreateLocationUseCase.kt
-service/usecase/UpdateLocationUseCase.kt
-service/usecase/SearchLocationUseCase.kt
-```
-
-### 5. API 응답 일관성
-모든 API는 `ApiResponse<T>` wrapper 사용 (common-web 제공):
-```kotlin
-ApiResponse.success(data)           // 성공 응답
-ApiResponse.error(code, message)    // 에러 응답
-```
+## Core Design Principles
+1. **Domain Entity**: Data class + BaseEntity composition (not inheritance). Use copy() for immutability.
+2. **JPA Entity**: Separate package (repository/jpa/entity/). Convert via toDomain()/fromDomain().
+3. **Repository**: Domain interface → JPA repo → impl class (3-layer)
+4. **Use Cases**: Each use case as independent service class
+5. **API Responses**: Always wrap with ApiResponse<T> (common-web)
