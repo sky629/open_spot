@@ -1,6 +1,7 @@
 # Open-Spot MSA Backend
 
 **Open-Spot**은 사용자가 방문한 장소에 대한 평점과 정보를 기록하고 관리하는 지도 기반 위치 공유 서비스입니다.
+**엔드포인트**: https://openspot.kang-labs.com/
 
 ## 💡 프로젝트 목적
 
